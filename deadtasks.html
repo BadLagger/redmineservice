@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Статистика Redmine - Полная версия</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        .stats-header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .stat-card {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        th {
+            background-color: #34495e;
+            color: white;
+            position: sticky;
+            top: 0;
+        }
+        
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .user-admin {
+            color: #e67e22;
+            font-weight: bold;
+        }
+        
+        .user-normal {
+            color: #27ae60;
+        }
+        
+        .overdue-tasks {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 18px;
+        }
+        
+        .error {
+            background: #e74c3c;
+            color: white;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .config-section {
+            background: #ecf0f1;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        input[type="text"] {
+            width: 600px;
+            padding: 12px;
+            margin: 5px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        
+        button {
+            background: #3498db;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background: #2980b9;
+        }
+        
+        button:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .url-info {
+            background: #d4edda;
+            color: #155724;
+            padding: 12px;
+            border-radius: 4px;
+            margin: 10px 0;
+            border: 1px solid #c3e6cb;
+        }
+
+        .filters {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+            border: 1px solid #ffeaa7;
+        }
+
+        .filter-group {
+            display: inline-block;
+            margin-right: 20px;
+        }
+
+        .filter-group label {
+            margin-right: 8px;
+            font-weight: bold;
+        }
+
+        .search-box {
+            margin: 15px 0;
+        }
+
+        .search-box input {
+            width: 300px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            background: #ecf0f1;
+            border-radius: 10px;
+            margin: 5px 0;
+        }
+        
+        .progress-fill {
+            height: 8px;
+            background: #3498db;
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+
+        .status-info {
+            background: #d6eaf8;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Полная статистика Redmine</h1>
+        
+        <div class="config-section">
+            <h3>Подключение к Redmine</h3>
+            <div class="url-info">
+                <strong>URL Redmine:</strong> http://redmine.kbnavis.local
+            </div>
+            <div>
+                <input type="password" id="apiKey" placeholder="Введите API ключ (админский для полного доступа)">
+            </div>
+            <button onclick="loadFullStatistics()">Загрузить полную статистику</button>
+            <button onclick="testConnection()">Проверить подключение</button>
+            <button onclick="debugStatuses()">Диагностика статусов</button>
+            <button onclick="debugUserTasks(44, 'grechko')">Диагностика задач grechko</button>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            ⏳ Загружаем данные... Это может занять несколько секунд
+            <div class="progress-bar">
+                <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+            </div>
+            <div id="progressText">0%</div>
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="statsSection" style="display: none;">
+            <div class="stats-header">
+                <h2>Общая статистика системы</h2>
+                <div id="totalStats"></div>
+            </div>
+
+            <div class="filters">
+                <div class="filter-group">
+                    <label>Тип пользователя:</label>
+                    <select id="typeFilter" onchange="filterUsers()">
+                        <option value="all">Все пользователи</option>
+                        <option value="admin">Только администраторы</option>
+                        <option value="user">Только обычные пользователи</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Сортировка:</label>
+                    <select id="sortFilter" onchange="sortUsers()">
+                        <option value="id">По ID</option>
+                        <option value="name">По имени</option>
+                        <option value="tasks">По общему количеству задач</option>
+                        <option value="overdue">По просроченным задачам</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Поиск по имени, логину или email..." onkeyup="searchUsers()">
+            </div>
+
+            <h2>Список всех пользователей</h2>
+            <table id="usersTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Имя</th>
+                        <th>Логин</th>
+                        <th>Email</th>
+                        <th>Тип</th>
+                        <th>Всего задач</th>
+                        <th>Активных</th>
+                        <th>Завершенных</th>
+                        <th>Просрочено</th>
+                        <th>Без даты</th>
+                        <th>Последний вход</th>
+                        <th>Дата регистрации</th>
+                    </tr>
+                </thead>
+                <tbody id="usersTableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Глобальные переменные
+        let allUsers = [];
+        let filteredUsers = [];
+        let statusInfo = {}; // Информация о статусах
+        let globalStats = {
+            totalUsers: 0,
+            adminUsers: 0,
+            normalUsers: 0,
+            totalIssues: 0,
+            activeIssues: 0,
+            completedIssues: 0,
+            overdueIssues: 0
+        };
+
+        // Функция для показа/скрытия элементов
+        function show(elementId) {
+            document.getElementById(elementId).style.display = 'block';
+        }
+        
+        function hide(elementId) {
+            document.getElementById(elementId).style.display = 'none';
+        }
+
+        // Функция для отображения ошибки
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.innerHTML = `❌ Ошибка: ${message}`;
+            show('error');
+        }
+
+        // Функция обновления прогресса
+        function updateProgress(processed, total) {
+            const percentage = Math.round((processed / total) * 100);
+            document.getElementById('progressFill').style.width = percentage + '%';
+            document.getElementById('progressText').textContent = `${percentage}% (${processed}/${total})`;
+        }
+
+        // Функция проверки подключения
+        async function testConnection() {
+            const apiKey = document.getElementById('apiKey').value;
+            
+            if (!apiKey) {
+                showError('Введите API ключ');
+                return;
+            }
+
+            show('loading');
+            hide('error');
+            hide('statsSection');
+
+            try {
+                const response = await fetch(`/api/issues.json?key=${apiKey}&limit=1`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                hide('loading');
+                alert(`✅ Подключение успешно! Всего задач в системе: ${data.total_count}`);
+                
+            } catch (error) {
+                hide('loading');
+                showError(`Не удалось подключиться: ${error.message}`);
+            }
+        }
+
+        // Функция для загрузки информации о статусах
+        async function loadStatusInfo(apiKey) {
+            try {
+                const response = await fetch(`/api/issue_statuses.json?key=${apiKey}`);
+                if (!response.ok) return;
+                
+                const data = await response.json();
+                
+                // Создаем карту статусов для быстрого доступа
+                statusInfo = {};
+                data.issue_statuses.forEach(status => {
+                    statusInfo[status.id] = {
+                        id: status.id,
+                        name: status.name,
+                        is_closed: status.is_closed
+                    };
+                });
+                
+                console.log('Загружена информация о статусах:', statusInfo);
+                
+            } catch (error) {
+                console.error('Ошибка при загрузке информации о статусах:', error);
+            }
+        }
+
+                // Функция для определения активных статусов (где срок актуален)
+        function getActiveStatusIds() {
+            // Активные статусы: где задача еще в работе и срок актуален
+            const activeStatusIds = [1, 2, 4, 7, 8, 9, 10, 11, 12, 14, 15, 16]; // Все кроме "Решена", "Сдано" и закрытых
+            
+            console.log('Активные статусы (срок актуален):', activeStatusIds.join(','));
+            return activeStatusIds.join(',');
+        }
+
+        // Функция для определения завершенных статусов
+        function getCompletedStatusIds() {
+            // Завершенные статусы: задача завершена (включая "Решена" и "Сдано")
+            const completedStatusIds = [3, 5, 6, 13]; // "Решена", "Закрыта", "Отклонена", "Сдано"
+            
+            console.log('Завершенные статусы:', completedStatusIds.join(','));
+            return completedStatusIds.join(',');
+        }
+
+        // Основная функция загрузки полной статистики
+        async function loadFullStatistics() {
+            const apiKey = document.getElementById('apiKey').value;
+            
+            if (!apiKey) {
+                showError('Введите API ключ');
+                return;
+            }
+
+            show('loading');
+            hide('error');
+            hide('statsSection');
+            allUsers = [];
+            filteredUsers = [];
+
+            try {
+                // Загружаем информацию о статусах
+                await loadStatusInfo(apiKey);
+                
+                // Загружаем общую статистику
+                await loadGlobalStats(apiKey);
+                
+                // Загружаем всех пользователей
+                await loadAllUsers(apiKey);
+                
+                // Для каждого пользователя загружаем статистику задач
+                await loadUsersTasksStats(apiKey);
+                
+                // Обновляем интерфейс
+                updateTotalStats();
+                updateUsersTable();
+                
+                hide('loading');
+                show('statsSection');
+                
+            } catch (error) {
+                hide('loading');
+                showError(`Ошибка при загрузке: ${error.message}`);
+            }
+        }
+
+        // Функция для загрузки всех пользователей
+        async function loadAllUsers(apiKey) {
+            try {
+                const response = await fetch(`/api/users.json?key=${apiKey}&limit=1000`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                allUsers = data.users.map(user => ({
+                    id: user.id,
+                    login: user.login,
+                    firstname: user.firstname,
+                    lastname: user.lastname,
+                    name: `${user.firstname} ${user.lastname}`,
+                    mail: user.mail,
+                    admin: user.admin,
+                    last_login_on: user.last_login_on,
+                    created_on: user.created_on,
+                    totalTasks: 0,
+                    activeTasks: 0,
+                    completedTasks: 0,
+                    overdueTasks: 0,
+                    nullDateTasks: 0
+                }));
+
+                // Статистика по пользователям
+                globalStats.totalUsers = allUsers.length;
+                globalStats.adminUsers = allUsers.filter(user => user.admin).length;
+                globalStats.normalUsers = allUsers.filter(user => !user.admin).length;
+
+                filteredUsers = [...allUsers];
+                
+                console.log(`Загружено пользователей: ${allUsers.length}`);
+                
+            } catch (error) {
+                throw new Error(`Не удалось загрузить пользователей: ${error.message}`);
+            }
+        }
+
+        // Функция для загрузки статистики задач по пользователям
+        // Функция для загрузки статистики задач по пользователям
+        async function loadUsersTasksStats(apiKey) {
+            const totalUsers = allUsers.length;
+            let processed = 0;
+            
+            // Получаем ID активных и завершенных статусов
+            const activeStatusIds = getActiveStatusIds();
+            const completedStatusIds = getCompletedStatusIds();
+            
+            console.log('Активные статусы ID:', activeStatusIds);
+            console.log('Завершенные статусы ID:', completedStatusIds);
+            
+            // Обновляем статус загрузки
+            updateProgress(0, totalUsers);
+            
+            for (const user of allUsers) {
+                try {
+                    // Получаем общее количество задач пользователя
+                    const totalResponse = await fetch(`/api/issues.json?key=${apiKey}&assigned_to_id=${user.id}&limit=100`);
+                    if (totalResponse.ok) {
+                        const totalData = await totalResponse.json();
+                        user.totalTasks = totalData.total_count || 0;
+                        totalData.issues.forEach(issue => {
+                            if (issue.status.name === "Закрыта" || issue.status.name === "Отклонена" || issue.status.name === "Решена" || issue.status.name === "Обратная связь") {
+                                user.completedTasks ++;
+                            } else {
+                                user.activeTasks ++;
+                                const now = new Date();
+                                const dueDate = issue.due_date ? new Date(issue.due_date) : null;
+                                if (dueDate) {
+                                    if (dueDate < now) {
+                                        console.log(`Otdated: "${issue.status.name }"`);
+                                        user.overdueTasks ++;
+                                    }
+                                } else {
+                                    user.nullDateTasks ++;
+                                }
+                            }
+                        });
+                    }
+
+                    // Получаем количество активных задач (где срок актуален)
+                   /* if (activeStatusIds) {
+                        const activeResponse = await fetch(`/api/issues.json?key=${apiKey}&assigned_to_id=${user.id}&status_id=${activeStatusIds}&limit=1`);
+                        if (activeResponse.ok) {
+                            const activeData = await activeResponse.json();
+                            user.activeTasks = activeData.total_count || 0;
+                        }
+                    }*/
+
+                    // Получаем количество завершенных задач
+                    /*if (completedStatusIds) {
+                        const completedResponse = await fetch(`/api/issues.json?key=${apiKey}&assigned_to_id=${user.id}&status_id=${completedStatusIds}&limit=1`);
+                        if (completedResponse.ok) {
+                            const completedData = await completedResponse.json();
+                            user.completedTasks = completedData.total_count || 0;
+                        }
+                    }*/
+
+                    // Получаем просроченные задачи среди активных - ИСПРАВЛЕННЫЙ ЗАПРОС
+                   /* if (activeStatusIds) {
+                        // Правильный формат для фильтрации по просроченным задачам
+                        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+                        const overdueResponse = await fetch(`/api/issues.json?key=${apiKey}&assigned_to_id=${user.id}&status_id=${activeStatusIds}&due_date=<${today}&limit=1`);
+                        
+                        if (overdueResponse.ok) {
+                            const overdueData = await overdueResponse.json();
+                            user.overdueTasks = overdueData.total_count || 0;
+                        } else if (overdueResponse.status === 422) {
+                            // Если запрос с due_date не работает, попробуем альтернативный метод
+                            console.log(`Запрос due_date не поддерживается для пользователя ${user.id}, используем альтернативный метод`);
+                            user.overdueTasks = 0; // Временно устанавливаем 0
+                        }
+                    }*/
+
+                    processed++;
+                    updateProgress(processed, totalUsers);
+                    
+                    // Небольшая задержка чтобы не перегружать API
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                    
+                } catch (error) {
+                    console.error(`Ошибка при загрузке задач пользователя ${user.id}:`, error);
+                    processed++;
+                    updateProgress(processed, totalUsers);
+                }
+            }
+        }
+
+        // Функция для загрузки общей статистики
+        async function loadGlobalStats(apiKey) {
+            try {
+                // Получаем ID активных и завершенных статусов
+                const activeStatusIds = getActiveStatusIds();
+                const completedStatusIds = getCompletedStatusIds();
+
+                // Общее количество задач
+                const totalResponse = await fetch(`/api/issues.json?key=${apiKey}&limit=1`);
+                const totalData = await totalResponse.json();
+                globalStats.totalIssues = totalData.total_count || 0;
+
+                // Количество активных задач (где срок актуален)
+                if (activeStatusIds) {
+                    const activeResponse = await fetch(`/api/issues.json?key=${apiKey}&status_id=${activeStatusIds}&limit=1`);
+                    if (activeResponse.ok) {
+                        const activeData = await activeResponse.json();
+                        globalStats.activeIssues = activeData.total_count || 0;
+                    }
+                }
+
+                // Количество завершенных задач
+                if (completedStatusIds) {
+                    const completedResponse = await fetch(`/api/issues.json?key=${apiKey}&status_id=${completedStatusIds}&limit=1`);
+                    if (completedResponse.ok) {
+                        const completedData = await completedResponse.json();
+                        globalStats.completedIssues = completedData.total_count || 0;
+                    }
+                }
+
+                // Количество просроченных задач среди активных
+                if (activeStatusIds) {
+                    const overdueResponse = await fetch(`/api/issues.json?key=${apiKey}&status_id=${activeStatusIds}&due_date=%3C=today&limit=1`);
+                    if (overdueResponse.ok) {
+                        const overdueData = await overdueResponse.json();
+                        globalStats.overdueIssues = overdueData.total_count || 0;
+                    }
+                }
+
+            } catch (error) {
+                console.error('Ошибка при загрузке общей статистики:', error);
+            }
+        }
+
+        // Функция обновления общей статистики
+        function updateTotalStats() {
+            const totalStats = document.getElementById('totalStats');
+            totalStats.innerHTML = `
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Всего пользователей</div>
+                        <div class="stat-number">${globalStats.totalUsers}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Администраторов</div>
+                        <div class="stat-number" style="color: #e67e22;">${globalStats.adminUsers}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Обычных пользователей</div>
+                        <div class="stat-number" style="color: #27ae60;">${globalStats.normalUsers}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Всего задач</div>
+                        <div class="stat-number">${globalStats.totalIssues}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Активных задач</div>
+                        <div class="stat-number" style="color: #f39c12;">${globalStats.activeIssues}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Завершенных задач</div>
+                        <div class="stat-number" style="color: #27ae60;">${globalStats.completedIssues}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Просроченных задач</div>
+                        <div class="stat-number overdue-tasks">${globalStats.overdueIssues}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Функция обновления таблицы пользователей
+        function updateUsersTable() {
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '';
+            
+            filteredUsers.forEach(user => {
+                const row = document.createElement('tr');
+                const userType = user.admin ? 'Администратор' : 'Пользователь';
+                const userTypeClass = user.admin ? 'user-admin' : 'user-normal';
+                const lastLogin = user.last_login_on ? new Date(user.last_login_on).toLocaleDateString('ru-RU') : 'Никогда';
+                const createdDate = user.created_on ? new Date(user.created_on).toLocaleDateString('ru-RU') : '—';
+                
+                row.innerHTML = `
+                    <td>${user.id}</td>
+                    <td><strong>${user.name}</strong></td>
+                    <td>${user.login}</td>
+                    <td>${user.mail || '—'}</td>
+                    <td><span class="${userTypeClass}">${userType}</span></td>
+                    <td><strong>${user.totalTasks}</strong></td>
+                    <td style="color: #f39c12;">${user.activeTasks}</td>
+                    <td style="color: #27ae60;">${user.completedTasks}</td>
+                    <td class="overdue-tasks">${user.overdueTasks > 0 ? user.overdueTasks : '0'}</td>
+                    <td style="color: #777777;">${user.nullDateTasks}</td>
+                    <td>${lastLogin}</td>
+                    <td>${createdDate}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Функции фильтрации и поиска
+        function filterUsers() {
+            const typeFilter = document.getElementById('typeFilter').value;
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            
+            filteredUsers = allUsers.filter(user => {
+                // Фильтр по типу пользователя
+                let typeMatch = true;
+                if (typeFilter === 'admin') {
+                    typeMatch = user.admin;
+                } else if (typeFilter === 'user') {
+                    typeMatch = !user.admin;
+                }
+                
+                // Фильтр по поиску
+                const searchMatch = !searchTerm || 
+                    user.name.toLowerCase().includes(searchTerm) ||
+                    user.login.toLowerCase().includes(searchTerm) ||
+                    (user.mail && user.mail.toLowerCase().includes(searchTerm));
+                
+                return typeMatch && searchMatch;
+            });
+            
+            sortUsers();
+        }
+
+        function searchUsers() {
+            filterUsers();
+        }
+
+        function sortUsers() {
+            const sortBy = document.getElementById('sortFilter').value;
+            
+            filteredUsers.sort((a, b) => {
+                switch (sortBy) {
+                    case 'name':
+                        return a.name.localeCompare(b.name);
+                    case 'tasks':
+                        return b.totalTasks - a.totalTasks;
+                    case 'overdue':
+                        return b.overdueTasks - a.overdueTasks;
+                    case 'id':
+                    default:
+                        return a.id - b.id;
+                }
+            });
+            
+            updateUsersTable();
+        }
+
+        // Автозаполнение для тестирования
+        document.addEventListener('DOMContentLoaded', function() {
+            // document.getElementById('apiKey').value = 'ваш_админский_ключ';
+        });
+
+        // Функция для диагностики статусов
+        async function debugStatuses() {
+            const apiKey = document.getElementById('apiKey').value;
+            try {
+                const response = await fetch(`/api/issue_statuses.json?key=${apiKey}`);
+                const data = await response.json();
+                
+                console.log('=== ВСЕ СТАТУСЫ В СИСТЕМЕ ===');
+                data.issue_statuses.forEach(status => {
+                    console.log(`ID: ${status.id}, Name: "${status.name}", is_closed: ${status.is_closed}`);
+                });
+                
+                // Покажем в alert для удобства
+                let message = 'Статусы в системе:\\n\\n';
+                data.issue_statuses.forEach(status => {
+                    message += `ID: ${status.id} - "${status.name}" (${status.is_closed ? 'Закрыт' : 'Открыт'})\\n`;
+                });
+                alert(message);
+                
+            } catch (error) {
+                console.error('Ошибка диагностики:', error);
+            }
+        }
+
+                // Функция для детальной диагностики задач пользователя
+        async function debugUserTasks(userId, login) {
+            const apiKey = document.getElementById('apiKey').value;
+            try {
+                console.log(`=== ДИАГНОСТИКА ЗАДАЧ ПОЛЬЗОВАТЕЛЯ ${login} ===`);
+                
+                // Получаем все задачи пользователя
+                const response = await fetch(`/api/issues.json?key=${apiKey}&assigned_to_id=${userId}&limit=100`);
+                const data = await response.json();
+                
+                console.log(`Всего задач: ${data.total_count}`);
+                console.log('Детали задач:');
+
+                console.log("Сырые данные:");
+                console.log(data);
+
+                const now = new Date();
+                console.log(now)
+
+                let activeTasks = 0
+                let notActiveTask = 0
+                let overdueTask = 0
+                let nullDateTask = 0
+                
+                data.issues.forEach(issue => {
+                    const dueDate = issue.due_date ? new Date(issue.due_date): null;
+                    //console.log(`ID: ${issue.id}, Тема: "${issue.subject}", Статус: "${issue.status.name}", Срок: "${dueDate}" (ID: ${issue.status.id})`);
+
+                    if (issue.status.name === "Закрыта" || issue.status.name === "Отклонена" || issue.status.name === "Решена") {
+                        notActiveTask ++;
+                    } else {
+                        activeTasks  ++;
+                        const now = new Date();
+                        const dueDate = issue.due_date ? new Date(issue.due_date) : null;
+                        console.log("Dates---");
+                        console.log(now);
+                        console.log(dueDate);
+                        if (dueDate) {
+                            if (dueDate < now) {
+                                console.log("OutDated"); 
+                                overdueTask ++;
+                            } else {
+                                console.log("NotOutDated");
+                            }
+                        } else {
+                            console.log("Null date");
+                            nullDateTask ++;
+                        }
+                        console.log("Dates end---");
+                    }
+                });
+
+                console.log(`ActiveTask: "${activeTasks}"`);
+                console.log(`notActiveTask: "${notActiveTask}"`);
+                console.log(`overDue: "${overdueTask}"`);
+                console.log(`nullDate: "${nullDateTask}"`);
+
+
+                
+            } catch (error) {
+                console.error('Ошибка диагностики:', error);
+            }
+        }
+
+    </script>
+</body>
+</html>

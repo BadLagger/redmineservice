@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Статистика Redmine</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        .stats-header {
+            background: #2c3e50;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .stat-card {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        th {
+            background-color: #34495e;
+            color: white;
+        }
+        
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        
+        .error {
+            background: #e74c3c;
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .config-section {
+            background: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        input[type="text"] {
+            width: 500px;
+            padding: 10px;
+            margin: 5px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        
+        button {
+            background: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background: #2980b9;
+        }
+        
+        button:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .url-info {
+            background: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            border: 1px solid #c3e6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Статистика Redmine</h1>
+        
+        <div class="config-section">
+            <h3>Подключение к Redmine</h3>
+            <div class="url-info">
+                <strong>URL Redmine:</strong> http://redmine.kbnavis.local
+            </div>
+            <div>
+                <input type="text" id="apiKey" placeholder="Введите ваш API ключ из Redmine">
+            </div>
+            <button onclick="loadUsers()">Загрузить пользователей</button>
+            <button onclick="testConnection()">Проверить подключение</button>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            ⏳ Загружаем данные...
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="statsSection" style="display: none;">
+            <div class="stats-header">
+                <h2>Общая статистика</h2>
+                <div id="totalStats"></div>
+            </div>
+
+            <h2>Список пользователей</h2>
+            <table id="usersTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Имя</th>
+                        <th>Статус</th>
+                    </tr>
+                </thead>
+                <tbody id="usersTableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Глобальные переменные
+        let currentUsers = [];
+        let globalStats = {
+            totalIssues: 0,
+            openIssues: 0,
+            closedIssues: 0
+        };
+
+        // Функция для показа/скрытия элементов
+        function show(elementId) {
+            document.getElementById(elementId).style.display = 'block';
+        }
+        
+        function hide(elementId) {
+            document.getElementById(elementId).style.display = 'none';
+        }
+
+        // Функция для отображения ошибки
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.innerHTML = `❌ Ошибка: ${message}`;
+            show('error');
+        }
+
+        // Функция проверки подключения
+        async function testConnection() {
+            const apiKey = document.getElementById('apiKey').value;
+            
+            if (!apiKey) {
+                showError('Введите API ключ');
+                return;
+            }
+
+            show('loading');
+            hide('error');
+            hide('statsSection');
+
+            try {
+                const response = await fetch(`/api/issues.json?key=${apiKey}&limit=1`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                hide('loading');
+                alert(`✅ Подключение успешно! Всего задач в системе: ${data.total_count}`);
+                
+            } catch (error) {
+                hide('loading');
+                showError(`Не удалось подключиться: ${error.message}`);
+            }
+        }
+
+                // Функция для получения статистики по задачам
+        async function loadGlobalStats(apiKey) {
+            try {
+                // Получаем общее количество задач
+                const totalResponse = await fetch(`/api/issues.json?key=${apiKey}&limit=1`);
+                const totalData = await totalResponse.json();
+                globalStats.totalIssues = totalData.total_count || 0;
+
+                // Получаем список статусов чтобы понять какие ID у открытых/закрытых статусов
+                const statusResponse = await fetch(`/api/issue_statuses.json?key=${apiKey}`);
+                const statusData = await statusResponse.json();
+                
+                // Находим ID закрытых статусов (is_closed = true)
+                const closedStatusIds = statusData.issue_statuses
+                    .filter(status => status.is_closed)
+                    .map(status => status.id)
+                    .join(',');
+
+                // Находим ID открытых статусов (is_closed = false)
+                const openStatusIds = statusData.issue_statuses
+                    .filter(status => !status.is_closed)
+                    .map(status => status.id)
+                    .join(',');
+
+                console.log('Закрытые статусы ID:', closedStatusIds);
+                console.log('Открытые статусы ID:', openStatusIds);
+
+                // Получаем количество открытых задач
+                if (openStatusIds) {
+                    const openResponse = await fetch(`/api/issues.json?key=${apiKey}&status_id=${openStatusIds}&limit=1`);
+                    const openData = await openResponse.json();
+                    globalStats.openIssues = openData.total_count || 0;
+                } else {
+                    globalStats.openIssues = 0;
+                }
+
+                // Получаем количество закрытых задач
+                if (closedStatusIds) {
+                    const closedResponse = await fetch(`/api/issues.json?key=${apiKey}&status_id=${closedStatusIds}&limit=1`);
+                    const closedData = await closedResponse.json();
+                    globalStats.closedIssues = closedData.total_count || 0;
+                } else {
+                    globalStats.closedIssues = 0;
+                }
+
+                console.log('Статистика:', globalStats);
+
+            } catch (error) {
+                console.error('Ошибка при загрузке статистики:', error);
+                // Альтернативный метод если не получается получить статусы
+                await loadGlobalStatsFallback(apiKey);
+            }
+        }
+
+        // Основная функция загрузки пользователей
+        async function loadUsers() {
+            const apiKey = document.getElementById('apiKey').value;
+            
+            if (!apiKey) {
+                showError('Введите API ключ');
+                return;
+            }
+
+            show('loading');
+            hide('error');
+            hide('statsSection');
+            currentUsers = [];
+
+            try {
+                // Сначала загружаем общую статистику
+                await loadGlobalStats(apiKey);
+                
+                // Затем загружаем пользователей
+                await loadUsersFromIssues(apiKey);
+            } catch (error) {
+                hide('loading');
+                showError(`Ошибка при загрузке: ${error.message}`);
+            }
+        }
+
+        // Функция для получения пользователей из задач
+        async function loadUsersFromIssues(apiKey) {
+            try {
+                const response = await fetch(`/api/issues.json?key=${apiKey}&limit=100`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                // Извлекаем уникальных пользователей из назначенных задач
+                const usersMap = new Map();
+                
+                data.issues.forEach(issue => {
+                    if (issue.assigned_to) {
+                        const user = issue.assigned_to;
+                        if (!usersMap.has(user.id)) {
+                            usersMap.set(user.id, {
+                                id: user.id,
+                                name: user.name,
+                                login: user.login || 'N/A',
+                                email: user.mail || 'N/A',
+                                status: 'active'
+                            });
+                        }
+                    }
+                });
+
+                currentUsers = Array.from(usersMap.values());
+                currentUsers.sort((a, b) => a.id - b.id);
+                
+                updateUsersTable();
+                updateTotalStats();
+                
+                hide('loading');
+                show('statsSection');
+                
+            } catch (error) {
+                throw new Error(`Не удалось загрузить пользователей: ${error.message}`);
+            }
+        }
+
+        // Функция обновления таблицы пользователей
+        function updateUsersTable() {
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '';
+            
+            currentUsers.forEach(user => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${user.id}</td>
+                    <td><strong>${user.name}</strong></td>
+                    <td><span style="color: green;">●</span> Активен</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Функция обновления общей статистики
+        function updateTotalStats() {
+            const totalStats = document.getElementById('totalStats');
+            totalStats.innerHTML = `
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Всего задач</div>
+                        <div class="stat-number">${globalStats.totalIssues}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Открытых задач</div>
+                        <div class="stat-number" style="color: #e74c3c;">${globalStats.openIssues}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Закрытых задач</div>
+                        <div class="stat-number" style="color: #27ae60;">${globalStats.closedIssues}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Пользователей с задачами</div>
+                        <div class="stat-number">${currentUsers.length}</div>
+                    </div>
+                </div>
+                <div style="margin-top: 15px; font-size: 0.9em; opacity: 0.8;">
+                    <strong>Процент закрытия:</strong> ${globalStats.totalIssues > 0 ? Math.round((globalStats.closedIssues / globalStats.totalIssues) * 100) : 0}%
+                </div>
+            `;
+        }
+
+        // Автозаполнение для тестирования (можно удалить в продакшене)
+        document.addEventListener('DOMContentLoaded', function() {
+            // Можно предзаполнить API ключ для тестирования
+            // document.getElementById('apiKey').value = '7e751dd926d10098d0da872108a114cd2059ff9d';
+        });
+    </script>
+</body>
+</html>
