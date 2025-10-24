@@ -292,6 +292,43 @@
     </div>
 
     <script>
+
+        class User {
+            id = null;
+            login = null;
+            firstname = null;
+            lastname = null;
+            admin = null;
+            main = null;
+            last_login = null;
+            created_on = null;
+            all_tasks = null;
+            
+            constructor(userData = {}) {
+                Object.assign(this, userData);
+            }
+
+            getTotalTasksNumber() {
+                if (this.all_tasks) {
+                    return this.all_tasks.length;
+                }
+                throw Error("Null Field");
+            }
+
+            getClosedTasksNumber() {
+                if (this.all_tasks) {
+                    const result = this.all_tasks.reduce((count, task) => {
+                        if (task.status && (task.status.name === "Закрыта" || task.status.name === "Отклонена")) {
+                            return count + 1;
+                        }
+                        return count;
+                    }, 0);
+                    return result;
+                }
+                throw Error("Null Field");
+            }
+        }
+    
         // Глобальные переменные
         let allUsers = [];
         let filteredUsers = [];
@@ -385,7 +422,7 @@
         }
 
                 // Функция для определения активных статусов (где срок актуален)
-        function getActiveStatusIds() {
+        /*function getActiveStatusIds() {
             // Активные статусы: где задача еще в работе и срок актуален
             const activeStatusIds = [1, 2, 4, 7, 8, 9, 10, 11, 12, 14, 15, 16]; // Все кроме "Решена", "Сдано" и закрытых
             
@@ -400,7 +437,7 @@
             
             console.log('Завершенные статусы:', completedStatusIds.join(','));
             return completedStatusIds.join(',');
-        }
+        }*/
 
         // Основная функция загрузки полной статистики
         async function loadFullStatistics() {
@@ -419,10 +456,10 @@
 
             try {
                 // Загружаем информацию о статусах
-                await loadStatusInfo(apiKey);
+              //  await loadStatusInfo(apiKey);
                 
                 // Загружаем общую статистику
-                await loadGlobalStats(apiKey);
+              //  await loadGlobalStats(apiKey);
                 
                 // Загружаем всех пользователей
                 await loadAllUsers(apiKey);
@@ -445,37 +482,59 @@
 
         // Функция для загрузки всех пользователей
         async function loadAllUsers(apiKey) {
+            let offset = 0;
+            let limit = 10;
+            let hasMore = true;
+
+            console.log("Load users...");
             try {
-                const response = await fetch(`/api/users.json?key=${apiKey}&limit=1000`);
+
+                while(hasMore) {
+                    const response = await fetch(`/api/users.json?key=${apiKey}&limit=${limit}&offset=${offset}`);
                 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const data = await response.json();
+
+                    console.log("++++USER RAW BGN");
+                    console.log(data);
+                    console.log("++++USER RAW END");
+
+                    console.log(`Total user count: ${data.total_count}`);
+                    console.log(`User limit: ${data.limit}`);
+                    console.log(`Offset: ${data.offset}`);
+                    console.log(`Array len: ${data.users.length}`)
+
+                    let batchUsers = data.users.map(user => new User({
+                        id: user.id,
+                        login: user.login,
+                        firstname: user.firstname,
+                        lastname: user.lastname,
+                        name: `${user.firstname} ${user.lastname}`,
+                        mail: user.mail,
+                        admin: user.admin,
+                        last_login_on: user.last_login_on,
+                        created_on: user.created_on,
+                    }));
+
+                    allUsers.push(...batchUsers);
+
+                    if ((data.offset + data.users.length) >= data.total_count) {
+                         hasMore = false;
+                    } else {
+                        offset = data.offset + data.users.length;
+                    }
+    
                 }
-                
-                const data = await response.json();
-                allUsers = data.users.map(user => ({
-                    id: user.id,
-                    login: user.login,
-                    firstname: user.firstname,
-                    lastname: user.lastname,
-                    name: `${user.firstname} ${user.lastname}`,
-                    mail: user.mail,
-                    admin: user.admin,
-                    last_login_on: user.last_login_on,
-                    created_on: user.created_on,
-                    totalTasks: 0,
-                    activeTasks: 0,
-                    completedTasks: 0,
-                    overdueTasks: 0,
-                    nullDateTasks: 0
-                }));
 
                 // Статистика по пользователям
                 globalStats.totalUsers = allUsers.length;
                 globalStats.adminUsers = allUsers.filter(user => user.admin).length;
                 globalStats.normalUsers = allUsers.filter(user => !user.admin).length;
 
-                filteredUsers = [...allUsers];
+                //filteredUsers = [...allUsers];
                 
                 console.log(`Загружено пользователей: ${allUsers.length}`);
                 
@@ -484,18 +543,69 @@
             }
         }
 
+        async function getUserTasks(apiKey, userId) {
+            let offset = 0;
+            let hasMore = true;
+            let resultTasks = []
+            try {
+                while (hasMore) {
+                    const response = await fetch(`/api/issues.json?key=${apiKey}&assigned_to_id=${userId}&limit=100&offset=${offset}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log(data);
+                        if (data.issues.length > 0)
+                            resultTasks.push(...data.issues);
+                        if ((data.offset + data.issues.length) < data.total_count) {
+                            offset = data.offset + data.issues.length;
+                        } else {
+                            hasMore = false;
+                            continue;
+                        }
+                    } else {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                }
+            } catch (error) {
+                throw error;
+            }
+
+            return resultTasks;
+        }
+
+        async function getAllUserTasks(apiKey, userId) {
+            let offset = 0;
+            let hasMore = true;
+            let resultTasks = []
+            try {
+                while (hasMore) {
+                    const response = await fetch(`/api/issues.json?key=${apiKey}&assigned_to_id=${userId}&limit=100&offset=${offset}&status_id=*`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log(data);
+                        if (data.issues.length > 0)
+                            resultTasks.push(...data.issues);
+                        if ((data.offset + data.issues.length) < data.total_count) {
+                            offset = data.offset + data.issues.length;
+                        } else {
+                            hasMore = false;
+                            continue;
+                        }
+                    } else {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                }
+            } catch (error) {
+                throw error;
+            }
+
+            return resultTasks;
+        }
+
         // Функция для загрузки статистики задач по пользователям
         // Функция для загрузки статистики задач по пользователям
         async function loadUsersTasksStats(apiKey) {
             const totalUsers = allUsers.length;
             let processed = 0;
-            
-            // Получаем ID активных и завершенных статусов
-            const activeStatusIds = getActiveStatusIds();
-            const completedStatusIds = getCompletedStatusIds();
-            
-            console.log('Активные статусы ID:', activeStatusIds);
-            console.log('Завершенные статусы ID:', completedStatusIds);
             
             // Обновляем статус загрузки
             updateProgress(0, totalUsers);
@@ -503,7 +613,13 @@
             for (const user of allUsers) {
                 try {
                     // Получаем общее количество задач пользователя
-                    const totalResponse = await fetch(`/api/issues.json?key=${apiKey}&assigned_to_id=${user.id}&limit=100`);
+                    user.all_tasks = await getUserTasks(apiKey, user.id);
+                    total_tasks = user.getTotalTasksNumber();
+                    closed_tasks = user.getClosedTasksNumber();
+                    globalStats.totalIssues += total_tasks;
+                    globalStats.completedIssues += closed_tasks;
+                    globalStats.activeIssues += (total_tasks - closed_tasks);
+                    /*const totalResponse = await fetch(`/api/issues.json?key=${apiKey}&assigned_to_id=${user.id}&limit=100`);
                     if (totalResponse.ok) {
                         const totalData = await totalResponse.json();
                         user.totalTasks = totalData.total_count || 0;
@@ -524,7 +640,7 @@
                                 }
                             }
                         });
-                    }
+                    }*/
 
                     // Получаем количество активных задач (где срок актуален)
                    /* if (activeStatusIds) {
@@ -578,8 +694,8 @@
         async function loadGlobalStats(apiKey) {
             try {
                 // Получаем ID активных и завершенных статусов
-                const activeStatusIds = getActiveStatusIds();
-                const completedStatusIds = getCompletedStatusIds();
+                //const activeStatusIds = getActiveStatusIds();
+                //const completedStatusIds = getCompletedStatusIds();
 
                 // Общее количество задач
                 const totalResponse = await fetch(`/api/issues.json?key=${apiKey}&limit=1`);
@@ -740,6 +856,30 @@
             // document.getElementById('apiKey').value = 'ваш_админский_ключ';
         });
 
+        async function getUserById(apiKey, userId) {
+            try {
+                const response = await fetch(`/api/users/${userId}.json?key=${apiKey}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log(data);
+                    return new User({
+                        id: data.user.id,
+                        login: data.user.login,
+                        firstname: data.user.firstname,
+                        lastname: data.user.lastname,
+                        mail: data.user.mail,
+                        admin: data.user.admin,
+                        last_login: data.user.last_login_on,
+                        created_on: data.user.created_on
+                    });
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                throw error;
+            }
+        }
+
         // Функция для диагностики статусов
         async function debugStatuses() {
             const apiKey = document.getElementById('apiKey').value;
@@ -767,64 +907,15 @@
                 // Функция для детальной диагностики задач пользователя
         async function debugUserTasks(userId, login) {
             const apiKey = document.getElementById('apiKey').value;
+
             try {
-                console.log(`=== ДИАГНОСТИКА ЗАДАЧ ПОЛЬЗОВАТЕЛЯ ${login} ===`);
-                
-                // Получаем все задачи пользователя
-                const response = await fetch(`/api/issues.json?key=${apiKey}&assigned_to_id=${userId}&limit=100`);
-                const data = await response.json();
-                
-                console.log(`Всего задач: ${data.total_count}`);
-                console.log('Детали задач:');
-
-                console.log("Сырые данные:");
-                console.log(data);
-
-                const now = new Date();
-                console.log(now)
-
-                let activeTasks = 0
-                let notActiveTask = 0
-                let overdueTask = 0
-                let nullDateTask = 0
-                
-                data.issues.forEach(issue => {
-                    const dueDate = issue.due_date ? new Date(issue.due_date): null;
-                    //console.log(`ID: ${issue.id}, Тема: "${issue.subject}", Статус: "${issue.status.name}", Срок: "${dueDate}" (ID: ${issue.status.id})`);
-
-                    if (issue.status.name === "Закрыта" || issue.status.name === "Отклонена" || issue.status.name === "Решена") {
-                        notActiveTask ++;
-                    } else {
-                        activeTasks  ++;
-                        const now = new Date();
-                        const dueDate = issue.due_date ? new Date(issue.due_date) : null;
-                        console.log("Dates---");
-                        console.log(now);
-                        console.log(dueDate);
-                        if (dueDate) {
-                            if (dueDate < now) {
-                                console.log("OutDated"); 
-                                overdueTask ++;
-                            } else {
-                                console.log("NotOutDated");
-                            }
-                        } else {
-                            console.log("Null date");
-                            nullDateTask ++;
-                        }
-                        console.log("Dates end---");
-                    }
-                });
-
-                console.log(`ActiveTask: "${activeTasks}"`);
-                console.log(`notActiveTask: "${notActiveTask}"`);
-                console.log(`overDue: "${overdueTask}"`);
-                console.log(`nullDate: "${nullDateTask}"`);
-
-
-                
+                user = await getUserById(apiKey, userId);
+                console.log("User: ", user);
+                user.all_tasks = await getAllUserTasks(apiKey, user.id);
+                console.log("Total tasks: ", user.getTotalTasksNumber());
+                console.log("Closed tasks: ", user.getClosedTasksNumber());
             } catch (error) {
-                console.error('Ошибка диагностики:', error);
+                console.error('Debug error: ', error);
             }
         }
 
