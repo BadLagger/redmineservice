@@ -245,14 +245,6 @@
 
             <div class="filters">
                 <div class="filter-group">
-                    <label>Тип пользователя:</label>
-                    <select id="typeFilter" onchange="filterUsers()">
-                        <option value="all">Все пользователи</option>
-                        <option value="admin">Только администраторы</option>
-                        <option value="user">Только обычные пользователи</option>
-                    </select>
-                </div>
-                <div class="filter-group">
                     <label>Сортировка:</label>
                     <select id="sortFilter" onchange="sortUsers()">
                         <option value="id">По ID</option>
@@ -275,10 +267,7 @@
                         <th>Имя</th>
                         <th>Логин</th>
                         <th>Email</th>
-                        <th>Тип</th>
                         <th>Всего задач</th>
-                        <th>Активных</th>
-                        <th>Завершенных</th>
                         <th>Просрочено</th>
                         <th>Без даты</th>
                         <th>Последний вход</th>
@@ -303,6 +292,10 @@
             last_login = null;
             created_on = null;
             all_tasks = null;
+            closed_tasks = null;
+            outdated_tasks = null;
+            without_date_tasks = null;
+
             
             constructor(userData = {}) {
                 Object.assign(this, userData);
@@ -317,13 +310,56 @@
 
             getClosedTasksNumber() {
                 if (this.all_tasks) {
-                    const result = this.all_tasks.reduce((count, task) => {
-                        if (task.status && (task.status.name === "Закрыта" || task.status.name === "Отклонена")) {
-                            return count + 1;
+                    if (!this.closed_tasks) {
+                        this.closed_tasks = this.all_tasks.reduce((count, task) => {
+                            if (task.status && (task.status.name === "Закрыта" || task.status.name === "Отклонена")) {
+                                return count + 1;
+                            }
+                            return count;
+                        }, 0);
+                    }
+                    return this.closed_tasks;
+                }
+                throw Error("Null Field");
+            }
+
+            getActiveTaskNumber() {
+                if (this.all_tasks) {
+                    return this.getTotalTasksNumber() - this.getClosedTasksNumber();
+                }
+                throw Error("Null Field");
+            }
+
+            getOutdatedTaskNumber() {
+                if (this.all_tasks) {
+                    if (!this.outdated_tasks) {
+                        const now = new Date();
+                        for (const task of this.all_tasks) {
+                            const dueDate = task.due_date ? new Date(task.due_date) : null;
+                            if (dueDate) {
+                                if (dueDate < now) {
+                                    this.outdated_tasks ++;
+                                }
+                            } else {
+                                this.without_date_tasks ++;
+                            }
                         }
-                        return count;
-                    }, 0);
-                    return result;
+                        if (!this.without_date_tasks)
+                            this.without_date_tasks = 0;
+                        if (!this.outdated_tasks)
+                            this.outdated_tasks = 0;
+                    }
+                    return this.outdated_tasks;
+                }
+                throw Error("Null Field");
+            }
+
+            getWitoutdateTasksNumber() {
+                if (this.all_tasks) {
+                    if (!this.without_date_tasks) {
+                        this.getOutdatedTaskNumber();
+                    }
+                    return this.without_date_tasks;
                 }
                 throw Error("Null Field");
             }
@@ -531,8 +567,8 @@
 
                 // Статистика по пользователям
                 globalStats.totalUsers = allUsers.length;
-                globalStats.adminUsers = allUsers.filter(user => user.admin).length;
-                globalStats.normalUsers = allUsers.filter(user => !user.admin).length;
+                //globalStats.adminUsers = allUsers.filter(user => user.admin).length;
+                //globalStats.normalUsers = allUsers.filter(user => !user.admin).length;
 
                 //filteredUsers = [...allUsers];
                 
@@ -614,11 +650,9 @@
                 try {
                     // Получаем общее количество задач пользователя
                     user.all_tasks = await getUserTasks(apiKey, user.id);
-                    total_tasks = user.getTotalTasksNumber();
-                    closed_tasks = user.getClosedTasksNumber();
-                    globalStats.totalIssues += total_tasks;
-                    globalStats.completedIssues += closed_tasks;
-                    globalStats.activeIssues += (total_tasks - closed_tasks);
+                    globalStats.totalIssues += user.getTotalTasksNumber();
+                    globalStats.activeIssues += user.getActiveTaskNumber();
+                    globalStats.overdueIssues += user.getOutdatedTaskNumber();
                     /*const totalResponse = await fetch(`/api/issues.json?key=${apiKey}&assigned_to_id=${user.id}&limit=100`);
                     if (totalResponse.ok) {
                         const totalData = await totalResponse.json();
@@ -691,7 +725,7 @@
         }
 
         // Функция для загрузки общей статистики
-        async function loadGlobalStats(apiKey) {
+        /*async function loadGlobalStats(apiKey) {
             try {
                 // Получаем ID активных и завершенных статусов
                 //const activeStatusIds = getActiveStatusIds();
@@ -732,12 +766,29 @@
             } catch (error) {
                 console.error('Ошибка при загрузке общей статистики:', error);
             }
-        }
+        }*/
 
         // Функция обновления общей статистики
         function updateTotalStats() {
             const totalStats = document.getElementById('totalStats');
+
             totalStats.innerHTML = `
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Всего пользователей</div>
+                        <div class="stat-number">${globalStats.totalUsers}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Всего задач</div>
+                        <div class="stat-number" style="color: #f39c12;">${globalStats.totalIssues}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Просроченных задач</div>
+                        <div class="stat-number overdue-tasks">${globalStats.overdueIssues}</div>
+                    </div>
+                </div>
+            `;
+            /*totalStats.innerHTML = `
                 <div class="stats-grid">
                     <div class="stat-card">
                         <div class="stat-label">Всего пользователей</div>
@@ -768,7 +819,7 @@
                         <div class="stat-number overdue-tasks">${globalStats.overdueIssues}</div>
                     </div>
                 </div>
-            `;
+            `;*/
         }
 
         // Функция обновления таблицы пользователей
@@ -776,7 +827,25 @@
             const tbody = document.getElementById('usersTableBody');
             tbody.innerHTML = '';
             
-            filteredUsers.forEach(user => {
+            allUsers.forEach(user => {
+                const row = document.createElement('tr');
+                const lastLogin = user.last_login_on ? new Date(user.last_login_on).toLocaleDateString('ru-RU') : 'Никогда';
+                const createdDate = user.created_on ? new Date(user.created_on).toLocaleDateString('ru-RU') : '—';
+
+                row.innerHTML = `
+                    <td>${user.id}</td>
+                    <td><strong>${user.name}</strong></td>
+                    <td>${user.login}</td>
+                    <td>${user.mail || '—'}</td>
+                    <td><strong>${user.getTotalTasksNumber()}</strong></td>
+                    <td class="overdue-tasks">${user.getOutdatedTaskNumber()}</td>
+                    <td style="color: #777777;">${user.getWitoutdateTasksNumber()}</td>
+                    <td>${lastLogin}</td>
+                    <td>${createdDate}</td>
+                `;
+                tbody.appendChild(row);
+            });
+            /*filteredUsers.forEach(user => {
                 const row = document.createElement('tr');
                 const userType = user.admin ? 'Администратор' : 'Пользователь';
                 const userTypeClass = user.admin ? 'user-admin' : 'user-normal';
@@ -798,7 +867,7 @@
                     <td>${createdDate}</td>
                 `;
                 tbody.appendChild(row);
-            });
+            });*/
         }
 
         // Функции фильтрации и поиска
@@ -834,14 +903,14 @@
         function sortUsers() {
             const sortBy = document.getElementById('sortFilter').value;
             
-            filteredUsers.sort((a, b) => {
+            allUsers.sort((a, b) => {
                 switch (sortBy) {
                     case 'name':
                         return a.name.localeCompare(b.name);
                     case 'tasks':
-                        return b.totalTasks - a.totalTasks;
+                        return b.getTotalTasksNumber() - a.getTotalTasksNumber();
                     case 'overdue':
-                        return b.overdueTasks - a.overdueTasks;
+                        return b.getOutdatedTaskNumber() - a.getOutdatedTaskNumber();
                     case 'id':
                     default:
                         return a.id - b.id;
