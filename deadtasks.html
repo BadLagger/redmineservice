@@ -207,6 +207,11 @@
             margin: 10px 0;
             font-size: 14px;
         }
+
+        .checkbox-cell {
+            width: 40px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -223,8 +228,6 @@
             </div>
             <button onclick="loadFullStatistics()">Загрузить полную статистику</button>
             <button onclick="testConnection()">Проверить подключение</button>
-            <button onclick="debugStatuses()">Диагностика статусов</button>
-            <button onclick="debugUserTasks(44, 'grechko')">Диагностика задач grechko</button>
         </div>
 
         <div id="loading" class="loading" style="display: none;">
@@ -247,10 +250,10 @@
                 <div class="filter-group">
                     <label>Сортировка:</label>
                     <select id="sortFilter" onchange="sortUsers()">
-                        <option value="id">По ID</option>
                         <option value="name">По имени</option>
                         <option value="tasks">По общему количеству задач</option>
                         <option value="overdue">По просроченным задачам</option>
+                        <option value="withoutdate">По задачам без дат</option>
                     </select>
                 </div>
             </div>
@@ -263,15 +266,12 @@
             <table id="usersTable">
                 <thead>
                     <tr>
-                        <th>ID</th>
+                        <th class="checkbox-cell">Выбор</th>
                         <th>Имя</th>
-                        <th>Логин</th>
-                        <th>Email</th>
                         <th>Всего задач</th>
                         <th>Просрочено</th>
                         <th>Без даты</th>
                         <th>Последний вход</th>
-                        <th>Дата регистрации</th>
                     </tr>
                 </thead>
                 <tbody id="usersTableBody">
@@ -295,10 +295,15 @@
             closed_tasks = null;
             outdated_tasks = null;
             without_date_tasks = null;
+            checked = false;
 
             
             constructor(userData = {}) {
                 Object.assign(this, userData);
+            }
+
+            getFullUsername() {
+                return `${this.firstname} ${this.lastname}`;
             }
 
             getTotalTasksNumber() {
@@ -310,7 +315,8 @@
 
             getClosedTasksNumber() {
                 if (this.all_tasks) {
-                    if (!this.closed_tasks) {
+                    if (this.closed_tasks === null) {
+                        this.closed_tasks = 0;
                         this.closed_tasks = this.all_tasks.reduce((count, task) => {
                             if (task.status && (task.status.name === "Закрыта" || task.status.name === "Отклонена")) {
                                 return count + 1;
@@ -332,7 +338,10 @@
 
             getOutdatedTaskNumber() {
                 if (this.all_tasks) {
-                    if (!this.outdated_tasks) {
+                    if (this.outdated_tasks === null) {
+                        this.outdated_tasks = 0;
+                        this.without_date_tasks = 0;
+                        console.log(`Load again outdated (${this.name}, ${this.outdated_tasks})`);
                         const now = new Date();
                         for (const task of this.all_tasks) {
                             const dueDate = task.due_date ? new Date(task.due_date) : null;
@@ -344,10 +353,6 @@
                                 this.without_date_tasks ++;
                             }
                         }
-                        if (!this.without_date_tasks)
-                            this.without_date_tasks = 0;
-                        if (!this.outdated_tasks)
-                            this.outdated_tasks = 0;
                     }
                     return this.outdated_tasks;
                 }
@@ -356,7 +361,9 @@
 
             getWitoutdateTasksNumber() {
                 if (this.all_tasks) {
-                    if (!this.without_date_tasks) {
+                    if (this.without_date_tasks === null) {
+                        this.without_date_tasks = 0;
+                        console.log("Load again without date");
                         this.getOutdatedTaskNumber();
                     }
                     return this.without_date_tasks;
@@ -457,24 +464,6 @@
             }
         }
 
-                // Функция для определения активных статусов (где срок актуален)
-        /*function getActiveStatusIds() {
-            // Активные статусы: где задача еще в работе и срок актуален
-            const activeStatusIds = [1, 2, 4, 7, 8, 9, 10, 11, 12, 14, 15, 16]; // Все кроме "Решена", "Сдано" и закрытых
-            
-            console.log('Активные статусы (срок актуален):', activeStatusIds.join(','));
-            return activeStatusIds.join(',');
-        }
-
-        // Функция для определения завершенных статусов
-        function getCompletedStatusIds() {
-            // Завершенные статусы: задача завершена (включая "Решена" и "Сдано")
-            const completedStatusIds = [3, 5, 6, 13]; // "Решена", "Закрыта", "Отклонена", "Сдано"
-            
-            console.log('Завершенные статусы:', completedStatusIds.join(','));
-            return completedStatusIds.join(',');
-        }*/
-
         // Основная функция загрузки полной статистики
         async function loadFullStatistics() {
             const apiKey = document.getElementById('apiKey').value;
@@ -524,7 +513,6 @@
 
             console.log("Load users...");
             try {
-
                 while(hasMore) {
                     const response = await fetch(`/api/users.json?key=${apiKey}&limit=${limit}&offset=${offset}`);
                 
@@ -534,14 +522,14 @@
                     
                     const data = await response.json();
 
-                    console.log("++++USER RAW BGN");
+                    /*console.log("++++USER RAW BGN");
                     console.log(data);
                     console.log("++++USER RAW END");
 
                     console.log(`Total user count: ${data.total_count}`);
                     console.log(`User limit: ${data.limit}`);
                     console.log(`Offset: ${data.offset}`);
-                    console.log(`Array len: ${data.users.length}`)
+                    console.log(`Array len: ${data.users.length}`);*/
 
                     let batchUsers = data.users.map(user => new User({
                         id: user.id,
@@ -567,10 +555,6 @@
 
                 // Статистика по пользователям
                 globalStats.totalUsers = allUsers.length;
-                //globalStats.adminUsers = allUsers.filter(user => user.admin).length;
-                //globalStats.normalUsers = allUsers.filter(user => !user.admin).length;
-
-                //filteredUsers = [...allUsers];
                 
                 console.log(`Загружено пользователей: ${allUsers.length}`);
                 
@@ -653,62 +637,6 @@
                     globalStats.totalIssues += user.getTotalTasksNumber();
                     globalStats.activeIssues += user.getActiveTaskNumber();
                     globalStats.overdueIssues += user.getOutdatedTaskNumber();
-                    /*const totalResponse = await fetch(`/api/issues.json?key=${apiKey}&assigned_to_id=${user.id}&limit=100`);
-                    if (totalResponse.ok) {
-                        const totalData = await totalResponse.json();
-                        user.totalTasks = totalData.total_count || 0;
-                        totalData.issues.forEach(issue => {
-                            if (issue.status.name === "Закрыта" || issue.status.name === "Отклонена" || issue.status.name === "Решена" || issue.status.name === "Обратная связь") {
-                                user.completedTasks ++;
-                            } else {
-                                user.activeTasks ++;
-                                const now = new Date();
-                                const dueDate = issue.due_date ? new Date(issue.due_date) : null;
-                                if (dueDate) {
-                                    if (dueDate < now) {
-                                        console.log(`Otdated: "${issue.status.name }"`);
-                                        user.overdueTasks ++;
-                                    }
-                                } else {
-                                    user.nullDateTasks ++;
-                                }
-                            }
-                        });
-                    }*/
-
-                    // Получаем количество активных задач (где срок актуален)
-                   /* if (activeStatusIds) {
-                        const activeResponse = await fetch(`/api/issues.json?key=${apiKey}&assigned_to_id=${user.id}&status_id=${activeStatusIds}&limit=1`);
-                        if (activeResponse.ok) {
-                            const activeData = await activeResponse.json();
-                            user.activeTasks = activeData.total_count || 0;
-                        }
-                    }*/
-
-                    // Получаем количество завершенных задач
-                    /*if (completedStatusIds) {
-                        const completedResponse = await fetch(`/api/issues.json?key=${apiKey}&assigned_to_id=${user.id}&status_id=${completedStatusIds}&limit=1`);
-                        if (completedResponse.ok) {
-                            const completedData = await completedResponse.json();
-                            user.completedTasks = completedData.total_count || 0;
-                        }
-                    }*/
-
-                    // Получаем просроченные задачи среди активных - ИСПРАВЛЕННЫЙ ЗАПРОС
-                   /* if (activeStatusIds) {
-                        // Правильный формат для фильтрации по просроченным задачам
-                        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-                        const overdueResponse = await fetch(`/api/issues.json?key=${apiKey}&assigned_to_id=${user.id}&status_id=${activeStatusIds}&due_date=<${today}&limit=1`);
-                        
-                        if (overdueResponse.ok) {
-                            const overdueData = await overdueResponse.json();
-                            user.overdueTasks = overdueData.total_count || 0;
-                        } else if (overdueResponse.status === 422) {
-                            // Если запрос с due_date не работает, попробуем альтернативный метод
-                            console.log(`Запрос due_date не поддерживается для пользователя ${user.id}, используем альтернативный метод`);
-                            user.overdueTasks = 0; // Временно устанавливаем 0
-                        }
-                    }*/
 
                     processed++;
                     updateProgress(processed, totalUsers);
@@ -723,50 +651,6 @@
                 }
             }
         }
-
-        // Функция для загрузки общей статистики
-        /*async function loadGlobalStats(apiKey) {
-            try {
-                // Получаем ID активных и завершенных статусов
-                //const activeStatusIds = getActiveStatusIds();
-                //const completedStatusIds = getCompletedStatusIds();
-
-                // Общее количество задач
-                const totalResponse = await fetch(`/api/issues.json?key=${apiKey}&limit=1`);
-                const totalData = await totalResponse.json();
-                globalStats.totalIssues = totalData.total_count || 0;
-
-                // Количество активных задач (где срок актуален)
-                if (activeStatusIds) {
-                    const activeResponse = await fetch(`/api/issues.json?key=${apiKey}&status_id=${activeStatusIds}&limit=1`);
-                    if (activeResponse.ok) {
-                        const activeData = await activeResponse.json();
-                        globalStats.activeIssues = activeData.total_count || 0;
-                    }
-                }
-
-                // Количество завершенных задач
-                if (completedStatusIds) {
-                    const completedResponse = await fetch(`/api/issues.json?key=${apiKey}&status_id=${completedStatusIds}&limit=1`);
-                    if (completedResponse.ok) {
-                        const completedData = await completedResponse.json();
-                        globalStats.completedIssues = completedData.total_count || 0;
-                    }
-                }
-
-                // Количество просроченных задач среди активных
-                if (activeStatusIds) {
-                    const overdueResponse = await fetch(`/api/issues.json?key=${apiKey}&status_id=${activeStatusIds}&due_date=%3C=today&limit=1`);
-                    if (overdueResponse.ok) {
-                        const overdueData = await overdueResponse.json();
-                        globalStats.overdueIssues = overdueData.total_count || 0;
-                    }
-                }
-
-            } catch (error) {
-                console.error('Ошибка при загрузке общей статистики:', error);
-            }
-        }*/
 
         // Функция обновления общей статистики
         function updateTotalStats() {
@@ -788,38 +672,6 @@
                     </div>
                 </div>
             `;
-            /*totalStats.innerHTML = `
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-label">Всего пользователей</div>
-                        <div class="stat-number">${globalStats.totalUsers}</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Администраторов</div>
-                        <div class="stat-number" style="color: #e67e22;">${globalStats.adminUsers}</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Обычных пользователей</div>
-                        <div class="stat-number" style="color: #27ae60;">${globalStats.normalUsers}</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Всего задач</div>
-                        <div class="stat-number">${globalStats.totalIssues}</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Активных задач</div>
-                        <div class="stat-number" style="color: #f39c12;">${globalStats.activeIssues}</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Завершенных задач</div>
-                        <div class="stat-number" style="color: #27ae60;">${globalStats.completedIssues}</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Просроченных задач</div>
-                        <div class="stat-number overdue-tasks">${globalStats.overdueIssues}</div>
-                    </div>
-                </div>
-            `;*/
         }
 
         // Функция обновления таблицы пользователей
@@ -833,41 +685,47 @@
                 const createdDate = user.created_on ? new Date(user.created_on).toLocaleDateString('ru-RU') : '—';
 
                 row.innerHTML = `
-                    <td>${user.id}</td>
+                    <td class="checkbox-cell">
+                        <input type="checkbox" class="user-checkbox" value="${user.id}">
+                    </td>
                     <td><strong>${user.name}</strong></td>
-                    <td>${user.login}</td>
-                    <td>${user.mail || '—'}</td>
                     <td><strong>${user.getTotalTasksNumber()}</strong></td>
                     <td class="overdue-tasks">${user.getOutdatedTaskNumber()}</td>
                     <td style="color: #777777;">${user.getWitoutdateTasksNumber()}</td>
                     <td>${lastLogin}</td>
-                    <td>${createdDate}</td>
                 `;
                 tbody.appendChild(row);
             });
-            /*filteredUsers.forEach(user => {
-                const row = document.createElement('tr');
-                const userType = user.admin ? 'Администратор' : 'Пользователь';
-                const userTypeClass = user.admin ? 'user-admin' : 'user-normal';
-                const lastLogin = user.last_login_on ? new Date(user.last_login_on).toLocaleDateString('ru-RU') : 'Никогда';
-                const createdDate = user.created_on ? new Date(user.created_on).toLocaleDateString('ru-RU') : '—';
-                
-                row.innerHTML = `
-                    <td>${user.id}</td>
-                    <td><strong>${user.name}</strong></td>
-                    <td>${user.login}</td>
-                    <td>${user.mail || '—'}</td>
-                    <td><span class="${userTypeClass}">${userType}</span></td>
-                    <td><strong>${user.totalTasks}</strong></td>
-                    <td style="color: #f39c12;">${user.activeTasks}</td>
-                    <td style="color: #27ae60;">${user.completedTasks}</td>
-                    <td class="overdue-tasks">${user.overdueTasks > 0 ? user.overdueTasks : '0'}</td>
-                    <td style="color: #777777;">${user.nullDateTasks}</td>
-                    <td>${lastLogin}</td>
-                    <td>${createdDate}</td>
-                `;
-                tbody.appendChild(row);
-            });*/
+
+            addCheckboxEventListeners();
+        }
+
+        function addCheckboxEventListeners() {
+            const checkboxes = document.querySelectorAll('.user-checkbox');
+
+            checkboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', function(){
+                    checkboxClickHandler(this);
+                });
+            });
+        }
+
+        function getUserByIdFromList(userId) {
+            return allUsers.find(user => user.id === userId);
+        }
+
+        function updateCheckboxById(userId, checkboxState) {
+            let currentUser = getUserByIdFromList(userId);
+            console.log(currentUser);
+            currentUser.checked = checkboxState;
+            console.log(`Update checkbox for User: ${currentUser.getFullUsername()} state: ${currentUser.checked}`);
+        }
+
+        function checkboxClickHandler(checkbox) {
+            const userId = parseInt(checkbox.value);
+            const isChecked = checkbox.checked;
+
+            updateCheckboxById(userId, isChecked);
         }
 
         // Функции фильтрации и поиска
@@ -911,7 +769,8 @@
                         return b.getTotalTasksNumber() - a.getTotalTasksNumber();
                     case 'overdue':
                         return b.getOutdatedTaskNumber() - a.getOutdatedTaskNumber();
-                    case 'id':
+                    case 'withoutdate':
+                        return b.getWitoutdateTasksNumber() - a.getWitoutdateTasksNumber();
                     default:
                         return a.id - b.id;
                 }
