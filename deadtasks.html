@@ -278,6 +278,10 @@
                 </tbody>
             </table>
         </div>
+
+        <div id="raitingSection" style="display: none;">
+            <button onclick="startRaitingPage()">Запустить рейтинг</button>
+        </div>
     </div>
 
     <script>
@@ -421,6 +425,7 @@
             show('loading');
             hide('error');
             hide('statsSection');
+            hide('rainigSection');
 
             try {
                 const response = await fetch(`/api/issues.json?key=${apiKey}&limit=1`);
@@ -476,6 +481,7 @@
             show('loading');
             hide('error');
             hide('statsSection');
+            hide('raitingSection');
             allUsers = [];
             filteredUsers = [];
 
@@ -498,6 +504,7 @@
                 
                 hide('loading');
                 show('statsSection');
+                show('raitingSection');
                 
             } catch (error) {
                 hide('loading');
@@ -716,9 +723,9 @@
 
         function updateCheckboxById(userId, checkboxState) {
             let currentUser = getUserByIdFromList(userId);
-            console.log(currentUser);
             currentUser.checked = checkboxState;
-            console.log(`Update checkbox for User: ${currentUser.getFullUsername()} state: ${currentUser.checked}`);
+            //const apiKey = document.getElementById('apiKey').value;
+           // getUsersLastActivity(apiKey, userId);
         }
 
         function checkboxClickHandler(checkbox) {
@@ -779,10 +786,21 @@
             updateUsersTable();
         }
 
-        // Автозаполнение для тестирования
-        document.addEventListener('DOMContentLoaded', function() {
-            // document.getElementById('apiKey').value = 'ваш_админский_ключ';
-        });
+        async function getUsersLastActivity(apiKey, userId) {
+            try {
+                const response = await fetch(`/api/journals.json?key=${apiKey}&user_id=${userId}&sort=created_on:desc`);
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log(data);
+                } else {
+                    console.log("Time entries error:");
+                    console.log(response);
+                }
+            } catch (error) {
+                throw error;
+            }
+        }
+
 
         async function getUserById(apiKey, userId) {
             try {
@@ -845,6 +863,27 @@
             } catch (error) {
                 console.error('Debug error: ', error);
             }
+        }
+
+        function startRaitingPage() {
+            console.log("Click Raiting Page");
+            const selectedUsers = [];
+
+            allUsers.forEach(user => {
+                if (user.checked) {
+                    selectedUsers.push(user);
+                }
+            });
+
+            console.log(`Selected users: ${selectedUsers.length}`);
+            if (selectedUsers.length > 0) {
+                localStorage.setItem('selectedUsers', JSON.stringify(selectedUsers));
+                window.location.href = 'raiting.html';   
+            } else {
+                alert("Необходимо выбрать хотябы одного пользователя!");
+            }
+
+            //
         }
 
     </script>
