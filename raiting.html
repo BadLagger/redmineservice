@@ -197,15 +197,24 @@
 
             if (selectedUsers.length > 0) {
                 allUsers = selectedUsers.map(userData => new User(userData));
-                updateUsersTable();
+                sortUsersByOutdatedTasks();
+                //updateUsersTable();
             } else {
                 alert("Пользователи не выбраны!");
                 goToConfigPage();
             }
         });
 
+        function sortUsersByOutdatedTasks() {
+            allUsers.sort((a, b) => {
+                return b.getOutdatedTaskNumber() - a.getOutdatedTaskNumber();
+            });
+            updateUsersTable();
+        }
+
         function updateUsersTable() {
             const tbody = document.getElementById('usersTable');
+            tbody.innerHTML = '';
 
             allUsers.forEach(user => {
                 const row = document.createElement('tr');

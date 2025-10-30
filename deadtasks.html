@@ -469,6 +469,22 @@
             }
         }
 
+        function saveApiKey() {
+            console.log("Try to save Api Key");
+            const apiKey = document.getElementById('apiKey').value;
+            const encrypted = btoa(apiKey);
+            localStorage.setItem('encryptedApiKey', encrypted);
+        }
+
+        function loadApiKey() {
+            console.log("Try to load Api Key");
+            const encrypted = localStorage.getItem('encryptedApiKey');
+            if (encrypted) {
+                const apiKey = atob(encrypted);
+                document.getElementById('apiKey').value = apiKey;
+            }
+        }
+
         // Основная функция загрузки полной статистики
         async function loadFullStatistics() {
             const apiKey = document.getElementById('apiKey').value;
@@ -885,6 +901,9 @@
 
             //
         }
+
+        document.addEventListener('DOMContentLoaded', loadApiKey);
+        document.getElementById('apiKey').addEventListener('change', saveApiKey);
 
     </script>
 </body>
