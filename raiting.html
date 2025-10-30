@@ -30,7 +30,7 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
-            font-size: 14px;
+            font-size: 18px;
         }
         
         th, td {
@@ -74,11 +74,27 @@
             background: #bdc3c7;
             cursor: not-allowed;
         }
+
+        .head-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+
+        .countdown {
+            font-weight: bold;
+            color: #2c3e50;
+            min-width: 120px;
+        }
     </style>
 </head>
 <body>
     <div>
-        <button onclick="goToConfigPage()">Конфигурация</button>
+        <div class="head-container">
+            <button onclick="goToConfigPage()">Конфигурация</button>
+            <div class="countdown" id="countdown">Следующее обновление через: --:--</div>
+        </div>
         <h1>ТОП сотрудников</h1>
         <table id="usersTable">
                 <thead>
@@ -187,7 +203,41 @@
             }
         }
 
+        async function getAllUserTasks(apiKey, userId) {
+            let offset = 0;
+            let hasMore = true;
+            let resultTasks = []
+            try {
+                while (hasMore) {
+                    const response = await fetch(`/api/issues.json?key=${apiKey}&assigned_to_id=${userId}&limit=100&offset=${offset}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log(data);
+                        if (data.issues.length > 0)
+                            resultTasks.push(...data.issues);
+                        if ((data.offset + data.issues.length) < data.total_count) {
+                            offset = data.offset + data.issues.length;
+                        } else {
+                            hasMore = false;
+                            continue;
+                        }
+                    } else {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                }
+            } catch (error) {
+                throw error;
+            }
+
+            return resultTasks;
+        }
+
         let allUsers = []
+        let apiKey = null
+        let autoRefreshInterval = null
+        let countdownInterval = null
+        const REFRESH_INTERVAL = 60000
+        let timeUntilRefresh = REFRESH_INTERVAL / 1000
 
         document.addEventListener('DOMContentLoaded', function(){
             console.log('Loading page rating DONE!!!');
@@ -195,10 +245,13 @@
 
             console.log(`Selected users from storage: ${selectedUsers.length}`);
 
+            loadApiKey();
+
             if (selectedUsers.length > 0) {
                 allUsers = selectedUsers.map(userData => new User(userData));
                 sortUsersByOutdatedTasks();
-                //updateUsersTable();
+                startAutorefresh();
+                startCountdown();
             } else {
                 alert("Пользователи не выбраны!");
                 goToConfigPage();
@@ -206,14 +259,23 @@
         });
 
         function sortUsersByOutdatedTasks() {
+
             allUsers.sort((a, b) => {
                 return b.getOutdatedTaskNumber() - a.getOutdatedTaskNumber();
             });
             updateUsersTable();
         }
 
+        function loadApiKey() {
+            console.log("Try to load Api Key");
+            const encrypted = localStorage.getItem('encryptedApiKey');
+            if (encrypted) {
+                apiKey = atob(encrypted);
+            }
+        }
+
         function updateUsersTable() {
-            const tbody = document.getElementById('usersTable');
+            const tbody = document.getElementById('usersTableBody');
             tbody.innerHTML = '';
 
             allUsers.forEach(user => {
@@ -227,11 +289,98 @@
                 `;
                 tbody.appendChild(row);
             });
+
+        }
+
+        function startCountdown() {
+            // Сбрасываем время до обновления
+            timeUntilRefresh = REFRESH_INTERVAL / 1000;
+            
+            // Очищаем предыдущий интервал, если он есть
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+            }
+            
+            // Сразу обновляем отображение
+            updateCountdownDisplay();
+            
+            // Запускаем новый интервал
+            countdownInterval = setInterval(() => {
+                timeUntilRefresh--;
+                updateCountdownDisplay();
+                
+                if (timeUntilRefresh <= 0) {
+                    timeUntilRefresh = REFRESH_INTERVAL / 1000; // Сбрасываем таймер
+                }
+            }, 1000);
+        }
+
+        function updateCountdownDisplay() {
+            const countdownElement = document.getElementById('countdown');
+            const minutes = Math.floor(timeUntilRefresh / 60);
+            const seconds = Math.floor(timeUntilRefresh % 60);
+            
+            countdownElement.textContent = `Следующее обновление через: ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function stopCountdown() {
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+            const countdownElement = document.getElementById('countdown');
+            countdownElement.textContent = 'Следующее обновление через: --:--';
         }
 
         function goToConfigPage() {
+            stopAutorefresh();
+            localStorage.setItem('loadOldInfo', true);
             window.location.href = 'deadtasks.html';
         }
+
+        function startAutorefresh() {
+            console.log("Start autorefresh");
+            autoRefreshInterval = setInterval(refreshData, REFRESH_INTERVAL);
+        }
+
+        function stopAutorefresh() {
+            console.log("Stop autorefresh");
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+            stopCountdown();
+        }
+
+        async function refreshData() {
+            try {
+                console.log("Start refresh");
+                stopCountdown(); // Останавливаем таймер на время обновления
+                
+                for (const user of allUsers) {
+                    user.all_tasks = await getAllUserTasks(apiKey, user.id);
+                    // Сбрасываем кэшированные значения
+                    user.closed_tasks = null;
+                    user.outdated_tasks = null;
+                    user.without_date_tasks = null;
+                }
+                console.log("Stop refresh");
+                
+                // Сохраняем обновленные данные
+                localStorage.setItem('selectedUsers', JSON.stringify(allUsers));
+                
+            } catch (error) {
+                console.error("Update error:", error);
+            }
+
+            sortUsersByOutdatedTasks();
+            startCountdown(); // Перезапускаем таймер после обновления
+        }
+
+        // Останавливаем автообновление при закрытии страницы
+        window.addEventListener('beforeunload', function() {
+            stopAutorefresh();
+        });
 
     </script>
 </body>

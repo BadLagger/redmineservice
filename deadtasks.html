@@ -652,7 +652,9 @@
             
             // Обновляем статус загрузки
             updateProgress(0, totalUsers);
-            
+            globalStats.totalIssues = 0;
+            globalStats.activeIssues = 0;
+            globalStats.overdueIssues = 0;
             for (const user of allUsers) {
                 try {
                     // Получаем общее количество задач пользователя
@@ -894,6 +896,7 @@
             console.log(`Selected users: ${selectedUsers.length}`);
             if (selectedUsers.length > 0) {
                 localStorage.setItem('selectedUsers', JSON.stringify(selectedUsers));
+                localStorage.setItem('oldAllUsers', JSON.stringify(allUsers));
                 window.location.href = 'raiting.html';   
             } else {
                 alert("Необходимо выбрать хотябы одного пользователя!");
@@ -902,7 +905,41 @@
             //
         }
 
-        document.addEventListener('DOMContentLoaded', loadApiKey);
+        function initPage() {
+            loadApiKey();
+
+            const loadOldInfo = localStorage.getItem('loadOldInfo');
+            if (loadOldInfo) {
+                console.log("Try to load old info");
+                localStorage.setItem('loadOldInfo', false);
+                const oldAllUsers = JSON.parse(localStorage.getItem('oldAllUsers') || '[]');
+                console.log(`Old All Users: ${oldAllUsers.length}`);
+                if (oldAllUsers.length > 0) {
+                    allUsers = oldAllUsers.map(userData => new User(userData));
+                    globalStats.totalUsers = allUsers.length;
+                    globalStats.totalIssues = 0;
+                    globalStats.activeIssues = 0;
+                    globalStats.overdueIssues = 0;
+                    allUsers.forEach(user => {
+                        globalStats.totalIssues += user.getTotalTasksNumber();
+                        globalStats.activeIssues += user.getActiveTaskNumber();
+                        globalStats.overdueIssues += user.getOutdatedTaskNumber();
+                    });
+                    updateUsersTable();
+                    allUsers.forEach(user => {
+                        const checkbox = document.querySelector(`input[type="checkbox"][value="${user.id}"]`);
+                        if (checkbox) {
+                            console.log(`Checked: ${user.checked}`);
+                            checkbox.checked = user.checked;
+                        }
+                    });
+                    show('statsSection');
+                    show('raitingSection');
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', initPage);
         document.getElementById('apiKey').addEventListener('change', saveApiKey);
 
     </script>
