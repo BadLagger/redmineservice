@@ -347,9 +347,11 @@
                         this.without_date_tasks = 0;
                         console.log(`Load again outdated (${this.name}, ${this.outdated_tasks})`);
                         const now = new Date();
+                        now.setHours(0, 0, 0, 0);
                         for (const task of this.all_tasks) {
                             const dueDate = task.due_date ? new Date(task.due_date) : null;
                             if (dueDate) {
+                                dueDate.setHours(0, 0, 0, 0);
                                 if (dueDate < now) {
                                     this.outdated_tasks ++;
                                 }
