@@ -31,7 +31,9 @@ func InitProxyController(apiKey, redmineUrl string) *ProxyController {
 }
 
 func (c *ProxyController) ProxyRedmineAPI(w http.ResponseWriter, r *http.Request) {
-	// Разрешаем CORS
+
+	c.log.Debug("Proxy redmine request")
+
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Redmine-API-Key")

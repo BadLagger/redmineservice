@@ -220,12 +220,6 @@
         
         <div class="config-section">
             <h3>Подключение к Redmine</h3>
-            <div class="url-info">
-                <strong>URL Redmine:</strong> http://redmine.kbnavis.local
-            </div>
-            <div>
-                <input type="password" id="apiKey" placeholder="Введите API ключ (админский для полного доступа)">
-            </div>
             <button onclick="loadFullStatistics()">Загрузить полную статистику</button>
             <button onclick="testConnection()">Проверить подключение</button>
         </div>
@@ -417,12 +411,6 @@
 
         // Функция проверки подключения
         async function testConnection() {
-            const apiKey = document.getElementById('apiKey').value;
-            
-            if (!apiKey) {
-                showError('Введите API ключ');
-                return;
-            }
 
             show('loading');
             hide('error');
@@ -430,7 +418,7 @@
             hide('rainigSection');
 
             try {
-                const response = await fetch(`/api/issues.json?key=${apiKey}&limit=1`);
+                const response = await fetch(`/api/issues.json?limit=1`);
                 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -447,9 +435,9 @@
         }
 
         // Функция для загрузки информации о статусах
-        async function loadStatusInfo(apiKey) {
+        async function loadStatusInfo() {
             try {
-                const response = await fetch(`/api/issue_statuses.json?key=${apiKey}`);
+                const response = await fetch(`/api/issue_statuses.json?`);
                 if (!response.ok) return;
                 
                 const data = await response.json();
@@ -471,30 +459,8 @@
             }
         }
 
-        function saveApiKey() {
-            console.log("Try to save Api Key");
-            const apiKey = document.getElementById('apiKey').value;
-            const encrypted = btoa(apiKey);
-            localStorage.setItem('encryptedApiKey', encrypted);
-        }
-
-        function loadApiKey() {
-            console.log("Try to load Api Key");
-            const encrypted = localStorage.getItem('encryptedApiKey');
-            if (encrypted) {
-                const apiKey = atob(encrypted);
-                document.getElementById('apiKey').value = apiKey;
-            }
-        }
-
         // Основная функция загрузки полной статистики
         async function loadFullStatistics() {
-            const apiKey = document.getElementById('apiKey').value;
-            
-            if (!apiKey) {
-                showError('Введите API ключ');
-                return;
-            }
 
             show('loading');
             hide('error');
@@ -504,17 +470,12 @@
             filteredUsers = [];
 
             try {
-                // Загружаем информацию о статусах
-              //  await loadStatusInfo(apiKey);
-                
-                // Загружаем общую статистику
-              //  await loadGlobalStats(apiKey);
                 
                 // Загружаем всех пользователей
-                await loadAllUsers(apiKey);
+                await loadAllUsers();
                 
                 // Для каждого пользователя загружаем статистику задач
-                await loadUsersTasksStats(apiKey);
+                await loadUsersTasksStats();
                 
                 // Обновляем интерфейс
                 updateTotalStats();
@@ -531,7 +492,7 @@
         }
 
         // Функция для загрузки всех пользователей
-        async function loadAllUsers(apiKey) {
+        async function loadAllUsers() {
             let offset = 0;
             let limit = 10;
             let hasMore = true;
@@ -539,22 +500,13 @@
             console.log("Load users...");
             try {
                 while(hasMore) {
-                    const response = await fetch(`/api/users.json?key=${apiKey}&limit=${limit}&offset=${offset}`);
+                    const response = await fetch(`/api/users.json?limit=${limit}&offset=${offset}`);
                 
                     if (!response.ok) {
                         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                     }
                     
                     const data = await response.json();
-
-                    /*console.log("++++USER RAW BGN");
-                    console.log(data);
-                    console.log("++++USER RAW END");
-
-                    console.log(`Total user count: ${data.total_count}`);
-                    console.log(`User limit: ${data.limit}`);
-                    console.log(`Offset: ${data.offset}`);
-                    console.log(`Array len: ${data.users.length}`);*/
 
                     let batchUsers = data.users.map(user => new User({
                         id: user.id,
@@ -588,13 +540,13 @@
             }
         }
 
-        async function getUserTasks(apiKey, userId) {
+        async function getUserTasks(userId) {
             let offset = 0;
             let hasMore = true;
             let resultTasks = []
             try {
                 while (hasMore) {
-                    const response = await fetch(`/api/issues.json?key=${apiKey}&assigned_to_id=${userId}&limit=100&offset=${offset}`);
+                    const response = await fetch(`/api/issues.json?assigned_to_id=${userId}&limit=100&offset=${offset}`);
                     if (response.ok) {
                         const data = await response.json();
                         console.log(data);
@@ -617,13 +569,13 @@
             return resultTasks;
         }
 
-        async function getAllUserTasks(apiKey, userId) {
+        async function getAllUserTasks(userId) {
             let offset = 0;
             let hasMore = true;
             let resultTasks = []
             try {
                 while (hasMore) {
-                    const response = await fetch(`/api/issues.json?key=${apiKey}&assigned_to_id=${userId}&limit=100&offset=${offset}&status_id=*`);
+                    const response = await fetch(`/api/issues.json?assigned_to_id=${userId}&limit=100&offset=${offset}&status_id=*`);
                     if (response.ok) {
                         const data = await response.json();
                         console.log(data);
@@ -648,7 +600,7 @@
 
         // Функция для загрузки статистики задач по пользователям
         // Функция для загрузки статистики задач по пользователям
-        async function loadUsersTasksStats(apiKey) {
+        async function loadUsersTasksStats() {
             const totalUsers = allUsers.length;
             let processed = 0;
             
@@ -660,7 +612,7 @@
             for (const user of allUsers) {
                 try {
                     // Получаем общее количество задач пользователя
-                    user.all_tasks = await getUserTasks(apiKey, user.id);
+                    user.all_tasks = await getUserTasks(user.id);
                     globalStats.totalIssues += user.getTotalTasksNumber();
                     globalStats.activeIssues += user.getActiveTaskNumber();
                     globalStats.overdueIssues += user.getOutdatedTaskNumber();
@@ -744,8 +696,6 @@
         function updateCheckboxById(userId, checkboxState) {
             let currentUser = getUserByIdFromList(userId);
             currentUser.checked = checkboxState;
-            //const apiKey = document.getElementById('apiKey').value;
-           // getUsersLastActivity(apiKey, userId);
         }
 
         function checkboxClickHandler(checkbox) {
@@ -753,32 +703,6 @@
             const isChecked = checkbox.checked;
 
             updateCheckboxById(userId, isChecked);
-        }
-
-        // Функции фильтрации и поиска
-        function filterUsers() {
-            const typeFilter = document.getElementById('typeFilter').value;
-            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            
-            filteredUsers = allUsers.filter(user => {
-                // Фильтр по типу пользователя
-                let typeMatch = true;
-                if (typeFilter === 'admin') {
-                    typeMatch = user.admin;
-                } else if (typeFilter === 'user') {
-                    typeMatch = !user.admin;
-                }
-                
-                // Фильтр по поиску
-                const searchMatch = !searchTerm || 
-                    user.name.toLowerCase().includes(searchTerm) ||
-                    user.login.toLowerCase().includes(searchTerm) ||
-                    (user.mail && user.mail.toLowerCase().includes(searchTerm));
-                
-                return typeMatch && searchMatch;
-            });
-            
-            sortUsers();
         }
 
         function searchUsers() {
@@ -806,9 +730,9 @@
             updateUsersTable();
         }
 
-        async function getUsersLastActivity(apiKey, userId) {
+        async function getUsersLastActivity(userId) {
             try {
-                const response = await fetch(`/api/journals.json?key=${apiKey}&user_id=${userId}&sort=created_on:desc`);
+                const response = await fetch(`/api/journals.json?user_id=${userId}&sort=created_on:desc`);
                 if (response.ok) {
                     const data = await response.json();
                     console.log(data);
@@ -822,9 +746,9 @@
         }
 
 
-        async function getUserById(apiKey, userId) {
+        async function getUserById(userId) {
             try {
-                const response = await fetch(`/api/users/${userId}.json?key=${apiKey}`);
+                const response = await fetch(`/api/users/${userId}.json?`);
                 if (response.ok) {
                     const data = await response.json();
                     console.log(data);
@@ -843,45 +767,6 @@
                 }
             } catch (error) {
                 throw error;
-            }
-        }
-
-        // Функция для диагностики статусов
-        async function debugStatuses() {
-            const apiKey = document.getElementById('apiKey').value;
-            try {
-                const response = await fetch(`/api/issue_statuses.json?key=${apiKey}`);
-                const data = await response.json();
-                
-                console.log('=== ВСЕ СТАТУСЫ В СИСТЕМЕ ===');
-                data.issue_statuses.forEach(status => {
-                    console.log(`ID: ${status.id}, Name: "${status.name}", is_closed: ${status.is_closed}`);
-                });
-                
-                // Покажем в alert для удобства
-                let message = 'Статусы в системе:\\n\\n';
-                data.issue_statuses.forEach(status => {
-                    message += `ID: ${status.id} - "${status.name}" (${status.is_closed ? 'Закрыт' : 'Открыт'})\\n`;
-                });
-                alert(message);
-                
-            } catch (error) {
-                console.error('Ошибка диагностики:', error);
-            }
-        }
-
-                // Функция для детальной диагностики задач пользователя
-        async function debugUserTasks(userId, login) {
-            const apiKey = document.getElementById('apiKey').value;
-
-            try {
-                user = await getUserById(apiKey, userId);
-                console.log("User: ", user);
-                user.all_tasks = await getAllUserTasks(apiKey, user.id);
-                console.log("Total tasks: ", user.getTotalTasksNumber());
-                console.log("Closed tasks: ", user.getClosedTasksNumber());
-            } catch (error) {
-                console.error('Debug error: ', error);
             }
         }
 
@@ -908,7 +793,6 @@
         }
 
         function initPage() {
-            loadApiKey();
 
             const loadOldInfo = localStorage.getItem('loadOldInfo');
             if (loadOldInfo) {
@@ -942,7 +826,6 @@
         }
 
         document.addEventListener('DOMContentLoaded', initPage);
-        document.getElementById('apiKey').addEventListener('change', saveApiKey);
 
     </script>
 </body>

@@ -51,7 +51,7 @@ func main() {
 	go func() {
 
 		router.HandleFunc("/", serveStatic).Methods("GET")
-		router.HandleFunc("/api/", proxyController.ProxyRedmineAPI)
+		router.HandleFunc("/api/{path:.+}", proxyController.ProxyRedmineAPI).Methods("GET")
 		router.HandleFunc("/health", healthCheck)
 
 		log.Info("Try to start server...")
