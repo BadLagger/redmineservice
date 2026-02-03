@@ -90,6 +90,12 @@ func (c *ProxyController) ProxyRedmineAPI(w http.ResponseWriter, r *http.Request
 	}
 }
 
+func (c *ProxyController) GetServerTime(w http.ResponseWriter, r *http.Request) {
+	c.log.Debug("Time request")
+	w.Header().Set("Content-Type", "text/plain")
+	fmt.Fprint(w, time.Now().Format(time.RFC3339))
+}
+
 // sendError отправляет ошибку в JSON формате
 func sendError(w http.ResponseWriter, message string, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")

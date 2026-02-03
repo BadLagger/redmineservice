@@ -51,7 +51,9 @@ func main() {
 	go func() {
 
 		router.HandleFunc("/", serveStatic).Methods("GET")
+		router.HandleFunc("/raiting.html", serveRaiting).Methods("GET") // Новый маршрут
 		router.HandleFunc("/api/{path:.+}", proxyController.ProxyRedmineAPI).Methods("GET")
+		router.HandleFunc("/time", proxyController.GetServerTime).Methods("GET")
 		router.HandleFunc("/health", healthCheck)
 
 		log.Info("Try to start server...")
@@ -84,6 +86,11 @@ func serveStatic(w http.ResponseWriter, r *http.Request) {
 
 	// Раздаем другие статические файлы
 	http.ServeFile(w, r, "."+r.URL.Path)
+}
+
+// serveRaiting раздает страницу рейтинга
+func serveRaiting(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "raiting.html")
 }
 
 // healthCheck проверка здоровья сервера
