@@ -8,28 +8,28 @@
         body {
             font-family: Arial, sans-serif;
             max-width: 1600px;
-            margin: 0 auto;
-            padding: 20px;
+            margin: 0;
+            padding: 2px;
             background-color: #f5f5f5;
         }
         
         .container {
             background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 5px;
+            border-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
         
         h1 {
             color: #333;
-            border-bottom: 2px solid #eee;
+            border-bottom: 1px solid #eee;
             padding-bottom: 10px;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
+            margin-top: 2px;
             font-size: 18px;
         }
         
@@ -77,25 +77,64 @@
 
         .head-container {
             display: flex;
-            justify-content: space-between;
+            justify-content: flex-end;
             align-items: center;
             width: 100%;
+	    margin-bottom: 2px;
+	    padding: 0;
         }
 
         .countdown {
             font-weight: bold;
             color: #2c3e50;
             min-width: 120px;
+	    font-size: 10px;
+	    text-align: right;
         }
+
+        /*.podium-1,
+        .podium-2,
+        .podium-3 {
+            animation: blinkAnimation 2s infinite;
+        }
+*/
+ /*      @keyframes blinkAnimation {*/
+          /*  0% { background-color: rgba(255, 182, 193, 0.3); }*/ /* бледно-красный */
+           /* 50% { background-color: rgba(255, 255, 255, 0.1); }*/ /* почти прозрачный */
+           /* 100% { background-color: rgba(255, 182, 193, 0.3); }*/ /* бледно-красный */
+       /* }*/
+
+        /* Дополнительные стили для первых трех мест */
+        .podium-1 {
+            font-weight: bold;
+            font-size: 20px;
+	    background-color: #fffacd;
+	    border-left: 4px solid gold;
+        }
+
+        .podium-2 {
+            font-weight: bold;
+            font-size: 19px;
+	    background-color: #f0f0f0;
+	    border-left: 4px solid silver;
+        }
+
+        .podium-3 {
+            font-weight: bold;
+            font-size: 18px;
+	    background-color: #ffe4b5;
+	    border-left: 4px solid #cd7f32; 
+        }
+	
     </style>
 </head>
 <body>
     <div>
         <div class="head-container">
-            <button onclick="goToConfigPage()">Конфигурация</button>
+         <!--   <button onclick="goToConfigPage()">Конфигурация</button> -->
             <div class="countdown" id="countdown">Следующее обновление через: --:--</div>
         </div>
-        <h1>ТОП сотрудников</h1>
+        <!--h1>ТОП сотрудников</h1 -->
         <table id="usersTable">
                 <thead>
                     <tr>
@@ -174,10 +213,15 @@
                         this.without_date_tasks = 0;
                         console.log(`Load again outdated (${this.name}, ${this.outdated_tasks})`);
                         const now = new Date();
+
+                        const endOfToday = new Date(now);
+                        endOfToday.setHours(0,0,0,0);
+
                         for (const task of this.all_tasks) {
                             const dueDate = task.due_date ? new Date(task.due_date) : null;
                             if (dueDate) {
-                                if (dueDate < now) {
+                                dueDate.setHours(0, 0, 0, 0);
+                                if (dueDate < endOfToday) {
                                     this.outdated_tasks ++;
                                 }
                             } else {
@@ -203,13 +247,13 @@
             }
         }
 
-        async function getAllUserTasks(apiKey, userId) {
+        async function getAllUserTasks(userId) {
             let offset = 0;
             let hasMore = true;
             let resultTasks = []
             try {
                 while (hasMore) {
-                    const response = await fetch(`/api/issues.json?key=${apiKey}&assigned_to_id=${userId}&limit=100&offset=${offset}`);
+                    const response = await fetch(`/api/issues.json?assigned_to_id=${userId}&limit=100&offset=${offset}`);
                     if (response.ok) {
                         const data = await response.json();
                         console.log(data);
@@ -233,7 +277,6 @@
         }
 
         let allUsers = []
-        let apiKey = null
         let autoRefreshInterval = null
         let countdownInterval = null
         const REFRESH_INTERVAL = 60000
@@ -245,7 +288,6 @@
 
             console.log(`Selected users from storage: ${selectedUsers.length}`);
 
-            loadApiKey();
 
             if (selectedUsers.length > 0) {
                 allUsers = selectedUsers.map(userData => new User(userData));
@@ -266,23 +308,29 @@
             updateUsersTable();
         }
 
-        function loadApiKey() {
-            console.log("Try to load Api Key");
-            const encrypted = localStorage.getItem('encryptedApiKey');
-            if (encrypted) {
-                apiKey = atob(encrypted);
-            }
-        }
-
         function updateUsersTable() {
             const tbody = document.getElementById('usersTableBody');
             tbody.innerHTML = '';
 
-            allUsers.forEach(user => {
+            allUsers.forEach((user, index) => {
                 const row = document.createElement('tr');
+
+                // Добавляем классы для первых трех мест
+                if (index === 0) {
+                    row.classList.add('podium-1');
+                } else if (index === 1) {
+                    row.classList.add('podium-2');
+                } else if (index === 2) {
+                    row.classList.add('podium-3');
+                }
                
                 row.innerHTML = `
-                    <td><strong>${user.name}</strong></td>
+                    <td>
+                        <strong>
+                            ${index + 1}. ${user.name}
+                            ${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : ''}
+                        </strong>
+                    </td>
                     <td><strong>${user.getTotalTasksNumber()}</strong></td>
                     <td class="overdue-tasks">${user.getOutdatedTaskNumber()}</td>
                     <td style="color: #777777;">${user.getWitoutdateTasksNumber()}</td>
@@ -358,7 +406,7 @@
                 stopCountdown(); // Останавливаем таймер на время обновления
                 
                 for (const user of allUsers) {
-                    user.all_tasks = await getAllUserTasks(apiKey, user.id);
+                    user.all_tasks = await getAllUserTasks(user.id);
                     // Сбрасываем кэшированные значения
                     user.closed_tasks = null;
                     user.outdated_tasks = null;
