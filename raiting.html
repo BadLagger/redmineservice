@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,14 +13,14 @@
             padding: 2px;
             background-color: #f5f5f5;
         }
-        
+
         .container {
             background: white;
             padding: 5px;
             border-radius: 4px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
         }
-        
+
         h1 {
             color: #333;
             border-bottom: 1px solid #eee;
@@ -32,20 +33,21 @@
             margin-top: 2px;
             font-size: 18px;
         }
-        
-        th, td {
+
+        th,
+        td {
             padding: 10px;
             text-align: left;
             border-bottom: 1px solid #ddd;
         }
-        
+
         th {
             background-color: #34495e;
             color: white;
             position: sticky;
             top: 0;
         }
-        
+
         tr:hover {
             background-color: #f8f9fa;
         }
@@ -65,11 +67,11 @@
             margin: 5px;
             font-size: 16px;
         }
-        
+
         button:hover {
             background: #2980b9;
         }
-        
+
         button:disabled {
             background: #bdc3c7;
             cursor: not-allowed;
@@ -77,19 +79,28 @@
 
         .head-container {
             display: flex;
-            justify-content: flex-end;
             align-items: center;
             width: 100%;
-	    margin-bottom: 2px;
-	    padding: 0;
+            margin-bottom: 2px;
+            padding: 0;
+        }
+
+        .status {
+            font-weight: bold;
+            color: #2c3e50;
+            min-width: 120px;
+            font-size: 10px;
+            margin-left: 10px;
+            text-align: left;
         }
 
         .countdown {
             font-weight: bold;
             color: #2c3e50;
             min-width: 120px;
-	    font-size: 10px;
-	    text-align: right;
+            font-size: 10px;
+            text-align: right;
+            margin-left: auto;
         }
 
         /*.podium-1,
@@ -98,54 +109,62 @@
             animation: blinkAnimation 2s infinite;
         }
 */
- /*      @keyframes blinkAnimation {*/
-          /*  0% { background-color: rgba(255, 182, 193, 0.3); }*/ /* бледно-красный */
-           /* 50% { background-color: rgba(255, 255, 255, 0.1); }*/ /* почти прозрачный */
-           /* 100% { background-color: rgba(255, 182, 193, 0.3); }*/ /* бледно-красный */
-       /* }*/
+        /*      @keyframes blinkAnimation {*/
+        /*  0% { background-color: rgba(255, 182, 193, 0.3); }*/
+        /* бледно-красный */
+        /* 50% { background-color: rgba(255, 255, 255, 0.1); }*/
+        /* почти прозрачный */
+        /* 100% { background-color: rgba(255, 182, 193, 0.3); }*/
+        /* бледно-красный */
+        /* }*/
 
         /* Дополнительные стили для первых трех мест */
         .podium-1 {
             font-weight: bold;
             font-size: 20px;
-	    background-color: #fffacd;
-	    border-left: 4px solid gold;
+            background-color: #fffacd;
+            border-left: 4px solid gold;
         }
 
         .podium-2 {
             font-weight: bold;
             font-size: 19px;
-	    background-color: #f0f0f0;
-	    border-left: 4px solid silver;
+            background-color: #f0f0f0;
+            border-left: 4px solid silver;
         }
 
         .podium-3 {
             font-weight: bold;
             font-size: 18px;
-	    background-color: #ffe4b5;
-	    border-left: 4px solid #cd7f32; 
+            background-color: #ffe4b5;
+            border-left: 4px solid #cd7f32;
         }
-	
     </style>
 </head>
+
 <body>
     <div>
         <div class="head-container">
-         <!--   <button onclick="goToConfigPage()">Конфигурация</button> -->
+            <!--   <button onclick="goToConfigPage()">Конфигурация</button> -->
+            <div class="status">Статус:
+                <span id="status">
+                    ⚪
+                </span>
+            </div>
             <div class="countdown" id="countdown">Следующее обновление через: --:--</div>
         </div>
         <!--h1>ТОП сотрудников</h1 -->
         <table id="usersTable">
-                <thead>
-                    <tr>
-                        <th>Имя</th>
-                        <th>Всего задач</th>
-                        <th>Просрочено</th>
-                        <th>Без даты</th>
-                    </tr>
-                </thead>
-                <tbody id="usersTableBody">
-                </tbody>
+            <thead>
+                <tr>
+                    <th>Имя</th>
+                    <th>Всего задач</th>
+                    <th>Просрочено</th>
+                    <th>Без даты</th>
+                </tr>
+            </thead>
+            <tbody id="usersTableBody">
+            </tbody>
         </table>
 
     </div>
@@ -167,7 +186,7 @@
             without_date_tasks = null;
             checked = false;
 
-            
+
             constructor(userData = {}) {
                 Object.assign(this, userData);
             }
@@ -215,17 +234,17 @@
                         const now = new Date();
 
                         const endOfToday = new Date(now);
-                        endOfToday.setHours(0,0,0,0);
+                        endOfToday.setHours(0, 0, 0, 0);
 
                         for (const task of this.all_tasks) {
                             const dueDate = task.due_date ? new Date(task.due_date) : null;
                             if (dueDate) {
                                 dueDate.setHours(0, 0, 0, 0);
                                 if (dueDate < endOfToday) {
-                                    this.outdated_tasks ++;
+                                    this.outdated_tasks++;
                                 }
                             } else {
-                                this.without_date_tasks ++;
+                                this.without_date_tasks++;
                             }
                         }
                     }
@@ -282,7 +301,7 @@
         const REFRESH_INTERVAL = 60000
         let timeUntilRefresh = REFRESH_INTERVAL / 1000
 
-        document.addEventListener('DOMContentLoaded', function(){
+        document.addEventListener('DOMContentLoaded', function () {
             console.log('Loading page rating DONE!!!');
             const selectedUsers = JSON.parse(localStorage.getItem('selectedUsers') || '[]');
 
@@ -323,7 +342,7 @@
                 } else if (index === 2) {
                     row.classList.add('podium-3');
                 }
-               
+
                 row.innerHTML = `
                     <td>
                         <strong>
@@ -343,20 +362,20 @@
         function startCountdown() {
             // Сбрасываем время до обновления
             timeUntilRefresh = REFRESH_INTERVAL / 1000;
-            
+
             // Очищаем предыдущий интервал, если он есть
             if (countdownInterval) {
                 clearInterval(countdownInterval);
             }
-            
+
             // Сразу обновляем отображение
             updateCountdownDisplay();
-            
+
             // Запускаем новый интервал
             countdownInterval = setInterval(() => {
                 timeUntilRefresh--;
                 updateCountdownDisplay();
-                
+
                 if (timeUntilRefresh <= 0) {
                     timeUntilRefresh = REFRESH_INTERVAL / 1000; // Сбрасываем таймер
                 }
@@ -367,8 +386,21 @@
             const countdownElement = document.getElementById('countdown');
             const minutes = Math.floor(timeUntilRefresh / 60);
             const seconds = Math.floor(timeUntilRefresh % 60);
-            
+
             countdownElement.textContent = `Следующее обновление через: ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function updateStatus(status) {
+            const stsEl = document.getElementById('status');
+            if (status === 'ok') {
+                stsEl.textContent = `🟢`;
+            } else if (status === 'error') {
+                stsEl.textContent = `🔴`;
+            } else if (status === 'wait') {
+                stsEl.textContent = `🟡`;
+            } else {
+                stsEl.textContent = `⚪`;
+            }
         }
 
         function stopCountdown() {
@@ -403,8 +435,9 @@
         async function refreshData() {
             try {
                 console.log("Start refresh");
+                updateStatus("wait");
                 stopCountdown(); // Останавливаем таймер на время обновления
-                
+
                 for (const user of allUsers) {
                     user.all_tasks = await getAllUserTasks(user.id);
                     // Сбрасываем кэшированные значения
@@ -413,12 +446,13 @@
                     user.without_date_tasks = null;
                 }
                 console.log("Stop refresh");
-                
+
                 // Сохраняем обновленные данные
                 localStorage.setItem('selectedUsers', JSON.stringify(allUsers));
-                
+                updateStatus("ok");
             } catch (error) {
                 console.error("Update error:", error);
+                updateStatus("error");
             }
 
             sortUsersByOutdatedTasks();
@@ -426,7 +460,7 @@
         }
 
         // Останавливаем автообновление при закрытии страницы
-        window.addEventListener('beforeunload', function() {
+        window.addEventListener('beforeunload', function () {
             stopAutorefresh();
         });
 
