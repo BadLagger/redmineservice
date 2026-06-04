@@ -103,6 +103,13 @@
             margin-left: auto;
         }
 
+        .last_update {
+            font-weight: bold;
+            color: #2c3e50;
+            min-width: 120px;
+            font-size: 10px;
+        }
+
         /*.podium-1,
         .podium-2,
         .podium-3 {
@@ -149,6 +156,11 @@
             <div class="status">Статус:
                 <span id="status">
                     ⚪
+                </span>
+            </div>
+            <div class="last_update">Последнее обновление: 
+                <span id="last_update_id">
+                    -
                 </span>
             </div>
             <div class="countdown" id="countdown">Следующее обновление через: --:--</div>
@@ -300,8 +312,17 @@
         let countdownInterval = null
         const REFRESH_INTERVAL = 60000
         let timeUntilRefresh = REFRESH_INTERVAL / 1000
+        let totalRequestCount = 0;
+        let succesFullCount   = 0;
 
-        document.addEventListener('DOMContentLoaded', function () {
+        function lastSuccessUpdate() {
+            date = new Date();
+
+            const upstr = document.getElementById('last_update_id');
+            upstr.textContent = date.toLocaleString();
+        }
+
+        document.addEventListener('DOMContentLoaded', async function () {
             console.log('Loading page rating DONE!!!');
             const selectedUsers = JSON.parse(localStorage.getItem('selectedUsers') || '[]');
 
@@ -310,7 +331,8 @@
 
             if (selectedUsers.length > 0) {
                 allUsers = selectedUsers.map(userData => new User(userData));
-                sortUsersByOutdatedTasks();
+                await refreshData();
+                //sortUsersByOutdatedTasks();
                 startAutorefresh();
                 startCountdown();
             } else {
@@ -450,6 +472,7 @@
                 // Сохраняем обновленные данные
                 localStorage.setItem('selectedUsers', JSON.stringify(allUsers));
                 updateStatus("ok");
+                lastSuccessUpdate();
             } catch (error) {
                 console.error("Update error:", error);
                 updateStatus("error");
